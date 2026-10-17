@@ -38,6 +38,7 @@ Keep `.env` private. Never commit provider tokens, paste them into chat, or put 
 | `OPENAI_IMAGE_MODEL` | No | Image model; defaults to `gpt-image-2.5-flare` |
 | `REPLICATE_API_TOKEN` | For video | Server-side Replicate token |
 | `REPLICATE_VIDEO_MODEL` | For video | Currently available Replicate model slug in `owner/name` format |
+| `REPLICATE_VIDEO_DEFAULT_INPUT` | No | Optional JSON object for model-specific inputs such as aspect ratio or duration |
 | `PORT` | No | Server port; defaults to 3000 |
 
 ### Image generation
@@ -46,7 +47,7 @@ Select **Generate image**, describe the image, and submit. The server calls the 
 
 ### Video generation
 
-Select **Generate video** after configuring `REPLICATE_API_TOKEN` and `REPLICATE_VIDEO_MODEL`. Pick a currently available video model from your Replicate account/catalog and verify its expected input schema. This starter sends `{ "prompt": "..." }`; models that require extra fields or a different schema will need a model-specific adapter. The UI polls the job and displays the returned output when it is a playable URL.
+Select **Generate video** after configuring `REPLICATE_API_TOKEN` and `REPLICATE_VIDEO_MODEL`. Pick a currently available video model from your Replicate account/catalog and verify its expected input schema. The starter sends the prompt plus any fields in `REPLICATE_VIDEO_DEFAULT_INPUT`, which must be a JSON object. Use the input fields documented for your selected model (for example, aspect ratio or duration); models with unusual schemas may still need a model-specific adapter. The UI polls the job and displays the returned output when it is a playable URL.
 
 ## Deploy on Render
 
