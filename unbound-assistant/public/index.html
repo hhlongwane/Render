@@ -16,6 +16,8 @@
     h1 { font-size:19px; margin:0; letter-spacing:-.4px; }
     .sub { color:var(--muted); font-size:12px; margin-top:2px; }
     .status { color:var(--muted); font-size:12px; text-align:right; }
+    .tools { display:flex; gap:7px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
+    .smallbtn { background:#1a1e29; color:var(--text); border:1px solid var(--line); border-radius:9px; padding:7px 10px; cursor:pointer; font-size:12px; }
     #feed { flex:1; padding:24px 0; display:flex; flex-direction:column; gap:16px; }
     .welcome { text-align:center; margin:auto; max-width:620px; padding:42px 12px; }
     .welcome h2 { font-size:clamp(28px,5vw,44px); line-height:1.08; letter-spacing:-1.5px; margin:0 0 14px; }
@@ -23,7 +25,7 @@
     .suggestions { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
     button, textarea { font:inherit; }
     .suggestions button { border:1px solid var(--line); background:#1a1e29; color:var(--text); border-radius:999px; padding:9px 13px; cursor:pointer; font-size:13px; }
-    .suggestions button:hover { border-color:var(--accent); }
+    .suggestions button:hover,.smallbtn:hover { border-color:var(--accent); }
     .message { max-width:86%; padding:14px 16px; border:1px solid var(--line); border-radius:16px; white-space:pre-wrap; overflow-wrap:anywhere; }
     .message.user { align-self:flex-end; background:#26392f; border-color:#3a5b49; }
     .message.assistant { align-self:flex-start; background:var(--panel); }
@@ -41,7 +43,7 @@
   <main class="shell">
     <header>
       <div class="brand"><div class="logo">U</div><div><h1>Unbound Assistant</h1><div class="sub">A separate AI workspace</div></div></div>
-      <div class="status" id="status">Checking connection…</div>
+      <div><div class="status" id="status">Checking connection…</div><div class="tools"><button class="smallbtn" id="memoryBtn" type="button">Memory (0)</button><button class="smallbtn" id="clearBtn" type="button">New chat</button></div></div>
     </header>
     <section id="feed" aria-live="polite">
       <div class="welcome" id="welcome">
@@ -56,10 +58,10 @@
     </section>
     <div class="composer">
       <form id="form">
-        <textarea id="prompt" aria-label="Message" placeholder="Tell the assistant what you want to do…" rows="1" required></textarea>
+        <textarea id="prompt" aria-label="Message" placeholder="Tell the assistant what you want to do… (or type Remember: followed by a note)" rows="1" required></textarea>
         <button id="send" type="submit">Send ↗</button>
       </form>
-      <p class="fine">Uses a model API and optional web search. Add your API key in the server environment, never in this page.</p>
+      <p class="fine">Chats and saved memories stay in this browser. Web search uses the configured model API. Never paste secrets into chat.</p>
     </div>
   </main>
 <script>
@@ -68,20 +70,32 @@
   const promptBox = document.querySelector("#prompt");
   const send = document.querySelector("#send");
   const status = document.querySelector("#status");
+  const memoryBtn = document.querySelector("#memoryBtn");
   const welcome = document.querySelector("#welcome");
-  const messages = [];
+  const CHAT_KEY = "unbound.chat.v1";
+  const MEMORY_KEY = "unbound.memories.v1";
+  let messages = readStore(CHAT_KEY, []);
+  let memories = readStore(MEMORY_KEY, []);
   let busy = false;
 
-  async function checkHealth() {
-    try {
-      const r = await fetch("/api/health");
-      const d = await r.json();
-      status.textContent = d.apiKeyConfigured ? "Model connection configured" : "Needs API key setup";
-    } catch { status.textContent = "Server connection unavailable"; }
+  function readStore(key, fallback) {
+    try { const value = JSON.parse(localStorage.getItem(key) || "null"); return Array.isArray(value) ? value : fallback; }
+    catch { return fallback; }
   }
-
-  function addMessage(role, content) {
-    welcome?.remove();
+  function saveStore() {
+    try {
+      localStorage.setItem(CHAT_KEY, JSON.stringify(messages.slice(-60)));
+      localStorage.setItem(MEMORY_KEY, JSON.stringify(memories.slice(-40)));
+    } catch { status.textContent = "Browser storage unavailable"; }
+    memoryBtn.textContent = "Memory (" + memories.length + ")";
+  }
+  function checkHealth() {
+    fetch("/api/health").then(r => r.json()).then(d => {
+      status.textContent = d.apiKeyConfigured ? "Model connected · " + d.model : "Needs API key setup";
+    }).catch(() => { status.textContent = "Server connection unavailable"; });
+  }
+  function addMessage(role, content, persist = true) {
+    document.querySelector("#welcome")?.remove();
     const node = document.createElement("article");
     node.className = "message " + role;
     const label = document.createElement("div");
@@ -91,45 +105,99 @@
     body.textContent = content;
     node.append(label, body);
     feed.append(node);
+    if (persist) {
+      messages.push({ role, content });
+      messages = messages.slice(-60);
+      saveStore();
+    }
     node.scrollIntoView({ behavior: "smooth", block: "start" });
     return node;
   }
-
+  function renderHistory() {
+    if (!messages.length) return;
+    welcome?.remove();
+    messages.forEach(m => addMessage(m.role, m.content, false));
+  }
   async function sendMessage(text) {
     if (!text.trim() || busy) return;
+    const trimmed = text.trim();
+    const rememberMatch = trimmed.match(/^remember\s*:\s*(.+)$/is);
+    if (rememberMatch) {
+      const note = rememberMatch[1].trim().slice(0, 500);
+      if (!note) return;
+      if (!memories.some(m => m.toLowerCase() === note.toLowerCase())) memories.push(note);
+      memories = memories.slice(-40);
+      saveStore();
+      addMessage("user", trimmed);
+      addMessage("assistant", "I'll use this saved note as context in future chats in this browser. You can review or delete it using Memory.");
+      return;
+    }
+    if (/^forget all memories$/i.test(trimmed)) {
+      memories = [];
+      saveStore();
+      addMessage("user", trimmed);
+      addMessage("assistant", "Saved browser memories cleared.");
+      return;
+    }
+
     busy = true; send.disabled = true;
-    messages.push({ role: "user", content: text.trim() });
-    addMessage("user", text.trim());
+    messages.push({ role: "user", content: trimmed });
+    messages = messages.slice(-60);
+    addMessage("user", trimmed, false);
+    saveStore();
     promptBox.value = "";
-    const waiting = addMessage("assistant", "Thinking…");
+    const waiting = addMessage("assistant", "Thinking…", false);
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages })
+        body: JSON.stringify({ messages, memories })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Request failed.");
       waiting.lastChild.textContent = data.answer;
       messages.push({ role: "assistant", content: data.answer });
+      messages = messages.slice(-60);
+      saveStore();
     } catch (err) {
       waiting.lastChild.textContent = "Error: " + (err.message || "Could not reach the assistant.");
       messages.pop();
+      saveStore();
     } finally {
       busy = false; send.disabled = false; promptBox.focus();
     }
   }
 
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    sendMessage(promptBox.value);
+  memoryBtn.addEventListener("click", () => {
+    const list = memories.length ? memories.map((m, i) => (i + 1) + ". " + m).join("\n") : "No saved memories yet.";
+    const choice = prompt("Saved memories (stored only in this browser):\n\n" + list + "\n\nType a memory number to delete it, or type CLEAR to delete all saved memories. Cancel to close.");
+    if (choice === null) return;
+    if (choice.trim().toUpperCase() === "CLEAR") memories = [];
+    else {
+      const index = Number(choice.trim()) - 1;
+      if (Number.isInteger(index) && index >= 0 && index < memories.length) memories.splice(index, 1);
+    }
+    saveStore();
   });
-  promptBox.addEventListener("keydown", (event) => {
+  document.querySelector("#clearBtn").addEventListener("click", () => {
+    if (!confirm("Start a new chat? Saved memories will be kept.")) return;
+    messages = [];
+    saveStore();
+    feed.innerHTML = '<div class="welcome" id="welcome"><h2>Think bigger.<br>Build from here.</h2><p>Ask questions, explore ideas, research topics, or work through a coding project one step at a time.</p><div class="suggestions"><button data-prompt="Help me plan and build a full-stack web app from scratch.">Build an app</button><button data-prompt="Research the best options for hosting a small AI project and compare the tradeoffs.">Research options</button><button data-prompt="Review this idea, identify risks, and make a step-by-step plan to execute it.">Make a plan</button></div></div>';
+    bindSuggestions();
+  });
+  function bindSuggestions() {
+    document.querySelectorAll("[data-prompt]").forEach(button => {
+      button.addEventListener("click", () => sendMessage(button.dataset.prompt));
+    });
+  }
+  form.addEventListener("submit", event => { event.preventDefault(); sendMessage(promptBox.value); });
+  promptBox.addEventListener("keydown", event => {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); }
   });
-  document.querySelectorAll("[data-prompt]").forEach((button) => {
-    button.addEventListener("click", () => sendMessage(button.dataset.prompt));
-  });
+  bindSuggestions();
+  saveStore();
+  renderHistory();
   checkHealth();
 </script>
 </body>
