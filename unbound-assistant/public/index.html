@@ -305,7 +305,7 @@
         workspaceId = data.sandboxId;
         localStorage.setItem(WORKSPACE_KEY, workspaceId);
         workspaceIdLabel.textContent = "Sandbox: " + workspaceId;
-        const output = ["> " + trimmed, "exit code: " + (data.exitCode ?? "unknown"), data.stdout ? "\\nSTDOUT\\n" + data.stdout : "", data.stderr ? "\\nSTDERR\\n" + data.stderr : "", "\\n" + data.note].filter(Boolean).join("\\n");
+        const output = ["> " + trimmed, "exit code: " + (data.exitCode ?? "unknown"), data.stdout ? "\nSTDOUT\n" + data.stdout : "", data.stderr ? "\nSTDERR\n" + data.stderr : "", "\n" + data.note].filter(Boolean).join("\n");
         waiting.lastChild.textContent = output;
         messages.push({ role: "assistant", content: output });
         messages = messages.slice(-60);
@@ -420,7 +420,7 @@
       const response = await authorizedFetch("/api/workspace/upload", { method: "POST", body: formData });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Upload failed.");
       workspaceId = data.sandboxId; localStorage.setItem(WORKSPACE_KEY, workspaceId); workspaceIdLabel.textContent = "Sandbox: " + workspaceId;
-      waiting.lastChild.textContent = "Uploaded " + data.filename + " (" + data.bytes + " bytes) to " + data.path + "\\nNow run commands such as: file " + data.path + " && strings -n 8 " + data.path;
+      waiting.lastChild.textContent = "Uploaded " + data.filename + " (" + data.bytes + " bytes) to " + data.path + "\nNow run commands such as: file " + data.path + " && strings -n 8 " + data.path;
     } catch (err) { waiting.lastChild.textContent = "Error: " + (err.message || "Upload failed."); waiting.classList.add("media-error"); }
     finally { busy = false; workspaceUploadBtn.disabled = false; }
   });
