@@ -155,10 +155,19 @@ app.post("/api/videos", rateLimit({ windowMs: 60 * 60_000, max: 3, name: "videos
     if (!/^[a-z0-9_-]+\/[a-z0-9_.-]+$/i.test(videoModel)) {
       return res.status(500).json({ error: "REPLICATE_VIDEO_MODEL must be a model slug in owner/name format." });
     }
+    let modelInput = {};
+    try {
+      const configuredInput = process.env.REPLICATE_VIDEO_DEFAULT_INPUT || "{}";
+      const parsedInput = JSON.parse(configuredInput);
+      if (!parsedInput || typeof parsedInput !== "object" || Array.isArray(parsedInput)) throw new Error("must be a JSON object");
+      modelInput = parsedInput;
+    } catch {
+      return res.status(500).json({ error: "REPLICATE_VIDEO_DEFAULT_INPUT must be a valid JSON object." });
+    }
     const response = await fetch(`https://api.replicate.com/v1/models/${videoModel}/predictions`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.REPLICATE_API_TOKEN}`, "Content-Type": "application/json", "Prefer": "wait=5" },
-      body: JSON.stringify({ input: { prompt } })
+      body: JSON.stringify({ input: { ...modelInput, prompt } })
     });
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data?.detail || data?.title || "The video provider rejected the request." });
