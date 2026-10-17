@@ -183,7 +183,7 @@
   }
   function checkHealth() {
     fetch("/api/health").then(r => r.json()).then(d => {
-      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") + (d.capabilities?.isolatedWorkspace ? " · sandbox ready" : "") + (d.capabilities?.githubRepositoryRead ? " · GitHub connected" : "") : "Needs API key setup";
+      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") + (d.capabilities?.isolatedWorkspace ? " · sandbox ready" : "") + (d.capabilities?.githubRepositoryRead ? " · GitHub connected" : "") : d.capabilities?.textChat ? "Text chat configured · open Dashboard" : "Needs API key setup";
     }).catch(() => { status.textContent = "Server connection unavailable"; });
   }
   function addMessage(role, content, persist = true) {
@@ -538,7 +538,7 @@
       const cards = [
         {title:"App server",detail:"Health endpoint responding",ok:health.ok},
         {title:"App password",detail:health.accessControlConfigured ? "Password protection configured" : "Set APP_ACCESS_PASSWORD (16+ characters)",ok:health.accessControlConfigured},
-        {title:"Chat & research",detail:features.chat ? "OpenAI API key configured" : "Needs OPENAI_API_KEY",ok:features.chat},
+        {title:"Text chat",detail:features.textChat ? "At least one text provider configured" : "Add a provider credential",ok:features.textChat},
         {title:"Image generation/editing",detail:features.imageGeneration ? "Configured · " + (features.imageModel || "default image model") : "Needs OpenAI API key",ok:features.imageGeneration},
         {title:"Speech & transcription",detail:features.audioGeneration ? "OpenAI audio API configured" : "Needs OpenAI API key",ok:features.audioGeneration},
         {title:"Python code analysis",detail:features.codeInterpreter ? "Available through chat tools" : "Needs OpenAI API key",ok:features.codeInterpreter},
