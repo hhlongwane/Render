@@ -34,6 +34,9 @@
     .media-error { color:#fecaca; }
     .image-options { display:none; gap:8px; align-items:center; margin:0 0 8px 4px; flex-wrap:wrap; }
     .image-options.visible { display:flex; }
+    .workspace-tools { display:none; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 8px 4px; color:var(--muted); font-size:12px; }
+    .workspace-tools.visible { display:flex; }
+    .workspace-tools input { max-width:220px; }
     .audio-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 8px 4px; }
     .audio-tools input { max-width:220px; color:var(--muted); font-size:12px; }
     .image-edit-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 8px 4px; }
@@ -74,7 +77,8 @@
       </div>
     </section>
     <div class="composer">
-      <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button><button class="smallbtn mode" type="button" data-mode="audio">Generate speech</button></div>
+      <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button><button class="smallbtn mode" type="button" data-mode="audio">Generate speech</button><button class="smallbtn mode" type="button" data-mode="workspace">Code / reverse engineer</button></div>
+      <div class="workspace-tools" id="workspaceTools"><label for="workspaceFile">Upload source/binary</label><input id="workspaceFile" type="file"><button id="workspaceUploadBtn" type="button">Upload to sandbox</button><button id="workspaceNewBtn" type="button">New sandbox</button><span id="workspaceIdLabel">Sandbox starts on first command.</span></div>
       <div class="image-edit-tools"><label for="imageEditFile">Edit an image</label><input id="imageEditFile" type="file" accept="image/png,image/jpeg,image/webp"><button id="imageEditBtn" type="button">Apply prompt to image</button></div>
       <div class="audio-tools"><label for="audioFile">Transcribe audio</label><input id="audioFile" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg,.flac"><button id="transcribeBtn" type="button">Transcribe file</button></div>
       <div class="image-options" id="imageOptions"><label for="imageSize">Size</label><select id="imageSize"><option value="1024x1024">Square</option><option value="1536x1024">Landscape</option><option value="1024x1536">Portrait</option><option value="auto">Auto</option></select><label for="imageQuality">Quality</label><select id="imageQuality"><option value="medium">Medium</option><option value="high" selected>High</option></select></div>
@@ -100,6 +104,12 @@
   const transcribeBtn = document.querySelector("#transcribeBtn");
   const imageEditFile = document.querySelector("#imageEditFile");
   const imageEditBtn = document.querySelector("#imageEditBtn");
+  const workspaceTools = document.querySelector("#workspaceTools");
+  const workspaceFile = document.querySelector("#workspaceFile");
+  const workspaceUploadBtn = document.querySelector("#workspaceUploadBtn");
+  const workspaceNewBtn = document.querySelector("#workspaceNewBtn");
+  const workspaceIdLabel = document.querySelector("#workspaceIdLabel");
+  const WORKSPACE_KEY = "unbound.workspace.id.v1";
   const ACCESS_KEY = "unbound.access.v1";
   const welcome = document.querySelector("#welcome");
   const CHAT_KEY = "unbound.chat.v1";
@@ -108,6 +118,7 @@
   let memories = readStore(MEMORY_KEY, []);
   let busy = false;
   let mode = "chat";
+  let workspaceId = localStorage.getItem(WORKSPACE_KEY) || "";
 
   function readStore(key, fallback) {
     try { const value = JSON.parse(localStorage.getItem(key) || "null"); return Array.isArray(value) ? value : fallback; }
@@ -137,7 +148,7 @@
   }
   function checkHealth() {
     fetch("/api/health").then(r => r.json()).then(d => {
-      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") : "Needs API key setup";
+      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") + (d.capabilities?.isolatedWorkspace ? " · sandbox ready" : "") : "Needs API key setup";
     }).catch(() => { status.textContent = "Server connection unavailable"; });
   }
   function addMessage(role, content, persist = true) {
@@ -206,8 +217,10 @@
       button.setAttribute("aria-pressed", String(active));
     });
     imageOptions.classList.toggle("visible", mode === "image");
-    promptBox.placeholder = mode === "image" ? "Describe the image to generate…" : mode === "video" ? "Describe the video to generate…" : mode === "audio" ? "Enter the words you want spoken…" : "Tell the assistant what you want to do… (or type Remember: followed by a note)";
-    send.textContent = mode === "image" ? "Create image" : mode === "video" ? "Create video" : mode === "audio" ? "Create speech" : "Send ↗";
+    promptBox.placeholder = mode === "image" ? "Describe the image to generate…" : mode === "video" ? "Describe the video to generate…" : mode === "audio" ? "Enter the words you want spoken…" : mode === "workspace" ? "Enter a shell command, e.g. pwd && ls -la or file /home/user/sample.bin" : "Tell the assistant what you want to do… (or type Remember: followed by a note)";
+    send.textContent = mode === "image" ? "Create image" : mode === "video" ? "Create video" : mode === "audio" ? "Create speech" : mode === "workspace" ? "Run command" : "Send ↗";
+    workspaceTools.classList.toggle("visible", mode === "workspace");
+    workspaceIdLabel.textContent = workspaceId ? "Sandbox: " + workspaceId : "Sandbox starts on first command.";
   }
   function findMediaUrl(value) {
     if (typeof value === "string" && /^https:\/\/\S+/i.test(value)) return value;
@@ -270,7 +283,7 @@
     const chosenMode = mode;
     addMessage("user", trimmed);
     promptBox.value = "";
-    const waiting = addMessage("assistant", chosenMode === "image" ? "Creating your image…" : chosenMode === "video" ? "Starting video generation…" : chosenMode === "audio" ? "Generating speech audio…" : "Thinking…");
+    const waiting = addMessage("assistant", chosenMode === "image" ? "Creating your image…" : chosenMode === "video" ? "Starting video generation…" : chosenMode === "audio" ? "Generating speech audio…" : chosenMode === "workspace" ? "Running command in isolated cloud workspace…" : "Thinking…");
     try {
       if (chosenMode === "image") {
         const response = await authorizedFetch("/api/images", {
@@ -285,6 +298,18 @@
         const url = await generateVideo(trimmed);
         waiting.remove();
         addMedia("video", url, trimmed);
+      } else if (chosenMode === "workspace") {
+        const response = await authorizedFetch("/api/workspace/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: trimmed, sandboxId: workspaceId || undefined }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Workspace command failed.");
+        workspaceId = data.sandboxId;
+        localStorage.setItem(WORKSPACE_KEY, workspaceId);
+        workspaceIdLabel.textContent = "Sandbox: " + workspaceId;
+        const output = ["> " + trimmed, "exit code: " + (data.exitCode ?? "unknown"), data.stdout ? "\\nSTDOUT\\n" + data.stdout : "", data.stderr ? "\\nSTDERR\\n" + data.stderr : "", "\\n" + data.note].filter(Boolean).join("\\n");
+        waiting.lastChild.textContent = output;
+        messages.push({ role: "assistant", content: output });
+        messages = messages.slice(-60);
+        saveStore();
       } else if (chosenMode === "audio") {
         const response = await authorizedFetch("/api/audio", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -381,6 +406,24 @@
     }
   });
 
+  workspaceNewBtn.addEventListener("click", () => {
+    if (!confirm("Create a fresh isolated sandbox? The current sandbox may expire automatically, and its files will not be copied.")) return;
+    workspaceId = ""; localStorage.removeItem(WORKSPACE_KEY); workspaceIdLabel.textContent = "A new sandbox will start on your next command.";
+  });
+  workspaceUploadBtn.addEventListener("click", async () => {
+    const file = workspaceFile.files && workspaceFile.files[0];
+    if (!file || busy) { if (!file) alert("Choose a file first."); return; }
+    busy = true; workspaceUploadBtn.disabled = true;
+    const waiting = addMessage("assistant", "Uploading " + file.name + " to isolated sandbox…");
+    try {
+      const formData = new FormData(); formData.append("file", file); if (workspaceId) formData.append("sandboxId", workspaceId);
+      const response = await authorizedFetch("/api/workspace/upload", { method: "POST", body: formData });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || "Upload failed.");
+      workspaceId = data.sandboxId; localStorage.setItem(WORKSPACE_KEY, workspaceId); workspaceIdLabel.textContent = "Sandbox: " + workspaceId;
+      waiting.lastChild.textContent = "Uploaded " + data.filename + " (" + data.bytes + " bytes) to " + data.path + "\\nNow run commands such as: file " + data.path + " && strings -n 8 " + data.path;
+    } catch (err) { waiting.lastChild.textContent = "Error: " + (err.message || "Upload failed."); waiting.classList.add("media-error"); }
+    finally { busy = false; workspaceUploadBtn.disabled = false; }
+  });
   accessBtn.addEventListener("click", () => {
     const entered = prompt("Enter the app access password. Leave blank to forget the saved password.");
     if (entered === null) return;
@@ -421,6 +464,7 @@
   bindSuggestions();
   saveStore();
   renderHistory();
+  if (workspaceId) workspaceIdLabel.textContent = "Sandbox: " + workspaceId;
   checkHealth();
 </script>
 </body>
