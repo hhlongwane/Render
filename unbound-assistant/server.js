@@ -110,7 +110,7 @@ app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, instructions, input, tools: [{ type: "web_search" }], store: false })
+      body: JSON.stringify({ model, instructions, input, tools: [{ type: "web_search" }, { type: "code_interpreter", container: { type: "auto" } }], store: false })
     });
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || "The model provider returned an error." });
@@ -129,7 +129,7 @@ app.post("/api/images", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "images
     const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim().slice(0, 8000) : "";
     if (!prompt) return res.status(400).json({ error: "Describe the image you want to generate." });
     const size = ["1024x1024", "1536x1024", "1024x1536", "auto"].includes(req.body?.size) ? req.body.size : "1024x1024";
-    const quality = ["low", "medium", "high", "xhigh", "max", "auto"].includes(req.body?.quality) ? req.body.quality : "high";
+    const quality = ["low", "medium", "high", "auto"].includes(req.body?.quality) ? req.body.quality : "high";
     const format = ["png", "jpeg", "webp"].includes(req.body?.format) ? req.body.format : "png";
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
@@ -144,6 +144,37 @@ app.post("/api/images", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "images
   } catch (error) {
     console.error("Image generation failed:", error?.message || error);
     res.status(500).json({ error: "Image generation failed. Check server logs and try again." });
+  }
+});
+
+app.post("/api/images/edit", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "image-edit" }), requireAppPassword, upload.single("image"), async (req, res) => {
+  try {
+    if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Image editing is not connected. Add OPENAI_API_KEY to the server environment." });
+    if (!req.file) return res.status(400).json({ error: "Choose an image to edit." });
+    if (!["image/png", "image/jpeg", "image/webp"].includes(req.file.mimetype)) return res.status(400).json({ error: "Use a PNG, JPEG, or WEBP image." });
+    const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim().slice(0, 8000) : "";
+    if (!prompt) return res.status(400).json({ error: "Describe the changes you want to make." });
+    const form = new FormData();
+    form.append("model", imageModel);
+    form.append("prompt", prompt);
+    form.append("image", new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname || "image.png");
+    form.append("size", ["1024x1024", "1536x1024", "1024x1536", "auto"].includes(req.body?.size) ? req.body.size : "auto");
+    form.append("quality", ["low", "medium", "high", "auto"].includes(req.body?.quality) ? req.body.quality : "high");
+    form.append("output_format", ["png", "jpeg", "webp"].includes(req.body?.format) ? req.body.format : "png");
+    const response = await fetch("https://api.openai.com/v1/images/edits", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: form
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || "Image editing failed." });
+    const image = data?.data?.[0]?.b64_json;
+    if (!image) return res.status(502).json({ error: "The image provider returned no edited image." });
+    const format = ["png", "jpeg", "webp"].includes(req.body?.format) ? req.body.format : "png";
+    res.json({ image: `data:image/${format};base64,${image}`, revisedPrompt: data.data[0].revised_prompt || null, model: imageModel });
+  } catch (error) {
+    console.error("Image edit failed:", error?.message || error);
+    res.status(500).json({ error: "Image editing failed. Check server logs and try again." });
   }
 });
 
@@ -167,6 +198,30 @@ app.post("/api/transcribe", rateLimit({ windowMs: 60 * 60_000, max: 10, name: "t
   } catch (error) {
     console.error("Transcription failed:", error?.message || error);
     res.status(500).json({ error: "Transcription failed. Check server logs and try again." });
+  }
+});
+
+app.post("/api/audio", rateLimit({ windowMs: 60 * 60_000, max: 10, name: "audio" }), requireAppPassword, async (req, res) => {
+  try {
+    if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Speech generation is not connected. Add OPENAI_API_KEY to the server environment." });
+    const input = typeof req.body?.text === "string" ? req.body.text.trim().slice(0, 4000) : "";
+    if (!input) return res.status(400).json({ error: "Enter the text you want spoken." });
+    const voice = ["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse", "marin", "cedar"].includes(req.body?.voice) ? req.body.voice : "coral";
+    const instructions = typeof req.body?.instructions === "string" ? req.body.instructions.slice(0, 1000) : "Speak naturally and clearly.";
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: audioModel, voice, input, instructions, response_format: "mp3" })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return res.status(response.status).json({ error: data?.error?.message || "Speech generation failed." });
+    }
+    const audio = Buffer.from(await response.arrayBuffer()).toString("base64");
+    res.json({ audio: `data:audio/mpeg;base64,${audio}`, model: audioModel, voice });
+  } catch (error) {
+    console.error("Speech generation failed:", error?.message || error);
+    res.status(500).json({ error: "Speech generation failed. Check server logs and try again." });
   }
 });
 
