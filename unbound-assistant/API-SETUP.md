@@ -31,6 +31,16 @@ Set these optional model variables only if you want to change defaults:
 
 **Important:** API usage is billed separately from a ChatGPT subscription. Your account must have access to the selected models and sufficient API billing/usage allowance.
 
+## 1A. Optional alternate text-chat providers
+
+The Dashboard's **Text model** selector can route text-only chat to additional providers. Add these server-side variables in Render only if you have accounts and API access:
+
+- Anthropic: `ANTHROPIC_API_KEY`; optional model override `ANTHROPIC_MODEL` (default `claude-sonnet-4-5`).
+- Google Gemini: `GEMINI_API_KEY`; optional model override `GEMINI_MODEL` (default `gemini-2.5-flash`).
+- OpenAI-compatible provider: `AI_COMPAT_BASE_URL` (must be HTTPS), `AI_COMPAT_MODEL`, and optional `AI_COMPAT_API_KEY`.
+
+After saving environment settings and redeploying, open Dashboard to refresh configured providers and choose a model. OpenAI retains web search, Python code interpreter, and connected agent tools; alternate providers currently provide text chat only. API keys are billed by their respective providers, separately from a ChatGPT subscription.
+
 ## 2. Required for the app's shared-password gate
 
 Set `APP_ACCESS_PASSWORD` to a randomly generated secret of at least 16 characters in your hosting service's environment settings. This is your own app password, not a third-party API key. The current starter uses one shared password; it does not yet provide individual user accounts.

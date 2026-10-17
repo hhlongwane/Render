@@ -16,6 +16,8 @@
     h1 { font-size:19px; margin:0; letter-spacing:-.4px; }
     .sub { color:var(--muted); font-size:12px; margin-top:2px; }
     .status { color:var(--muted); font-size:12px; text-align:right; }
+    .provider-label { color:var(--muted); font-size:12px; align-self:center; }
+    .provider-select { max-width:230px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:9px; padding:7px 9px; font:inherit; font-size:12px; }
     .dashboard { margin:16px 0 4px; padding:16px; border:1px solid var(--line); border-radius:16px; background:rgba(23,26,35,.92); }
     .dashboard[hidden] { display:none; }
     .dashboard-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
@@ -95,7 +97,7 @@
       </div>
     </section>
     <div class="composer">
-      <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button><button class="smallbtn mode" type="button" data-mode="audio">Generate speech</button><button class="smallbtn mode" type="button" data-mode="workspace">Code / reverse engineer</button><button class="smallbtn" id="securityLabBtn" type="button">Run security tests</button></div>
+      <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button><button class="smallbtn mode" type="button" data-mode="audio">Generate speech</button><button class="smallbtn mode" type="button" data-mode="workspace">Code / reverse engineer</button><label class="provider-label" for="providerSelect">Text model</label><select class="provider-select" id="providerSelect" aria-label="Text model"><option value="openai">OpenAI</option></select><button class="smallbtn" id="securityLabBtn" type="button">Run security tests</button></div>
       <div class="workspace-tools" id="workspaceTools"><label for="workspaceFile">Upload source/binary</label><input id="workspaceFile" type="file"><button id="workspaceUploadBtn" type="button">Upload to sandbox</button><button id="workspaceNewBtn" type="button">New sandbox</button><span id="workspaceIdLabel">Sandbox starts on first command.</span></div>
       <div class="image-edit-tools"><label for="imageEditFile">Edit an image</label><input id="imageEditFile" type="file" accept="image/png,image/jpeg,image/webp"><button id="imageEditBtn" type="button">Apply prompt to image</button></div>
       <div class="audio-tools"><label for="audioFile">Transcribe audio</label><input id="audioFile" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg,.flac"><button id="transcribeBtn" type="button">Transcribe file</button></div>
@@ -118,6 +120,8 @@
   const dashboard = document.querySelector("#dashboard");
   const dashboardGrid = document.querySelector("#dashboardGrid");
   const dashboardNote = document.querySelector("#dashboardNote");
+  const providerSelect = document.querySelector("#providerSelect");
+  const PROVIDER_KEY = "unbound.provider.v1";
   const accessBtn = document.querySelector("#accessBtn");
   const imageOptions = document.querySelector("#imageOptions");
   const imageSize = document.querySelector("#imageSize");
@@ -141,6 +145,15 @@
   let busy = false;
   let mode = "chat";
   let workspaceId = localStorage.getItem(WORKSPACE_KEY) || "";
+  const storedProvider = localStorage.getItem(PROVIDER_KEY) || "openai";
+  if (![...providerSelect.options].some(option => option.value === storedProvider)) {
+    const savedOption = document.createElement("option");
+    savedOption.value = storedProvider;
+    savedOption.textContent = storedProvider + " (saved selection)";
+    providerSelect.append(savedOption);
+  }
+  providerSelect.value = storedProvider;
+  providerSelect.addEventListener("change", () => localStorage.setItem(PROVIDER_KEY, providerSelect.value));
 
   function readStore(key, fallback) {
     try { const value = JSON.parse(localStorage.getItem(key) || "null"); return Array.isArray(value) ? value : fallback; }
@@ -170,7 +183,7 @@
   }
   function checkHealth() {
     fetch("/api/health").then(r => r.json()).then(d => {
-      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") + (d.capabilities?.isolatedWorkspace ? " · sandbox ready" : "") + (d.capabilities?.githubRepositoryRead ? " · GitHub connected" : "") : "Needs API key setup";
+      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") + (d.capabilities?.isolatedWorkspace ? " · sandbox ready" : "") + (d.capabilities?.githubRepositoryRead ? " · GitHub connected" : "") : d.capabilities?.textChat ? "Text chat configured · open Dashboard" : "Needs API key setup";
     }).catch(() => { status.textContent = "Server connection unavailable"; });
   }
   function addMessage(role, content, persist = true) {
@@ -344,7 +357,7 @@
       } else {
         const response = await authorizedFetch("/api/chat", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages, memories })
+          body: JSON.stringify({ messages, memories, provider: providerSelect.value || "openai" })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Request failed.");
@@ -498,14 +511,34 @@
       try {
         const modelsResponse = await authorizedFetch("/api/models", { cache: "no-store" });
         const models = await modelsResponse.json();
-        if (modelsResponse.ok) { providers = Array.isArray(models.providers) ? models.providers : []; providerNote = providers.length ? providers.map(p => p.label + " (" + p.model + ")").join(" · ") : "No model provider credentials configured."; }
+        if (modelsResponse.ok) {
+          providers = Array.isArray(models.providers) ? models.providers : [];
+          providerNote = providers.length ? providers.map(p => p.label + " (" + p.model + ")").join(" · ") : "No model provider credentials configured.";
+          providerSelect.replaceChildren();
+          providerSelect.disabled = false;
+          if (providers.length) {
+            for (const provider of providers) {
+              const option = document.createElement("option");
+              option.value = provider.id;
+              option.textContent = provider.label + " · " + provider.model;
+              providerSelect.append(option);
+            }
+            const preferredStored = localStorage.getItem(PROVIDER_KEY) || providerSelect.value;
+            const preferred = providers.some(provider => provider.id === preferredStored) ? preferredStored : providers.some(provider => provider.id === "openai") ? "openai" : providers[0].id;
+            providerSelect.value = preferred;
+            localStorage.setItem(PROVIDER_KEY, preferred);
+          } else {
+            const option = document.createElement("option"); option.value = "openai"; option.textContent = "No providers configured";
+            providerSelect.append(option); providerSelect.disabled = true;
+          }
+        }
         else providerNote = models.error || providerNote;
       } catch (err) { providerNote = err.message || providerNote; }
       const features = health.capabilities || {};
       const cards = [
         {title:"App server",detail:"Health endpoint responding",ok:health.ok},
         {title:"App password",detail:health.accessControlConfigured ? "Password protection configured" : "Set APP_ACCESS_PASSWORD (16+ characters)",ok:health.accessControlConfigured},
-        {title:"Chat & research",detail:features.chat ? "OpenAI API key configured" : "Needs OPENAI_API_KEY",ok:features.chat},
+        {title:"Text chat",detail:features.textChat ? "At least one text provider configured" : "Add a provider credential",ok:features.textChat},
         {title:"Image generation/editing",detail:features.imageGeneration ? "Configured · " + (features.imageModel || "default image model") : "Needs OpenAI API key",ok:features.imageGeneration},
         {title:"Speech & transcription",detail:features.audioGeneration ? "OpenAI audio API configured" : "Needs OpenAI API key",ok:features.audioGeneration},
         {title:"Python code analysis",detail:features.codeInterpreter ? "Available through chat tools" : "Needs OpenAI API key",ok:features.codeInterpreter},
@@ -528,7 +561,7 @@
       const providerTitle = document.createElement("strong"); providerTitle.textContent = "Model providers";
       const providerDetail = document.createElement("span"); providerDetail.textContent = providerNote;
       providerCard.append(providerTitle, providerDetail); dashboardGrid.prepend(providerCard);
-      dashboardNote.textContent = "Active chat currently uses " + (health.model || "the configured OpenAI model") + ". Additional provider adapters currently power the security lab. Status is configuration-only; provider credentials and billing are managed in Render environment settings.";
+      dashboardNote.textContent = "Active text chat uses the selected provider above. OpenAI provides web search, code interpreter, and connected agent tools; alternate providers currently provide text-only chat. Status is configuration-only; provider credentials and billing are managed in Render environment settings.";
     } catch (err) {
       dashboardGrid.replaceChildren();
       const card = document.createElement("div"); card.className = "dash-card";

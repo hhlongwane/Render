@@ -29,7 +29,7 @@ export function getConfiguredProviders() {
     id: "gemini", label: "Google Gemini", model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
     endpoint: "https://generativelanguage.googleapis.com/v1beta/models"
   });
-  if (process.env.AI_COMPAT_BASE_URL && process.env.AI_COMPAT_MODEL) providers.push({
+  if (process.env.AI_COMPAT_BASE_URL && /^https:\/\//i.test(process.env.AI_COMPAT_BASE_URL) && process.env.AI_COMPAT_MODEL) providers.push({
     id: "compatible", label: "OpenAI-compatible endpoint", model: process.env.AI_COMPAT_MODEL,
     endpoint: process.env.AI_COMPAT_BASE_URL
   });
@@ -48,7 +48,7 @@ async function requestJson(url, options) {
   return data;
 }
 
-export async function askProvider(providerId, { system, prompt }) {
+export async function askProvider(providerId, { system, prompt, maxTokens = 300 }) {
   const provider = getConfiguredProviders().find(item => item.id === providerId);
   if (!provider) throw new Error("That provider is not configured in Render environment variables.");
 
@@ -57,13 +57,13 @@ export async function askProvider(providerId, { system, prompt }) {
     data = await requestJson(provider.endpoint, {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({ model: provider.model, instructions: system, input: prompt, store: false })
+      body: JSON.stringify({ model: provider.model, instructions: system, input: prompt, max_output_tokens: maxTokens, store: false })
     });
   } else if (providerId === "anthropic") {
     data = await requestJson(provider.endpoint, {
       method: "POST",
       headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: provider.model, max_tokens: 300, system, messages: [{ role: "user", content: prompt }] })
+      body: JSON.stringify({ model: provider.model, max_tokens: maxTokens, system, messages: [{ role: "user", content: prompt }] })
     });
   } else if (providerId === "gemini") {
     const model = encodeURIComponent(provider.model);
@@ -73,7 +73,7 @@ export async function askProvider(providerId, { system, prompt }) {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 300, temperature: 0 }
+        generationConfig: { maxOutputTokens: maxTokens, temperature: 0 }
       })
     });
   } else {
@@ -83,7 +83,7 @@ export async function askProvider(providerId, { system, prompt }) {
     if (process.env.AI_COMPAT_API_KEY) headers.authorization = `Bearer ${process.env.AI_COMPAT_API_KEY}`;
     data = await requestJson(`${base}/chat/completions`, {
       method: "POST", headers,
-      body: JSON.stringify({ model: provider.model, temperature: 0, max_tokens: 300, messages: [{ role: "system", content: system }, { role: "user", content: prompt }] })
+      body: JSON.stringify({ model: provider.model, temperature: 0, max_tokens: maxTokens, messages: [{ role: "system", content: system }, { role: "user", content: prompt }] })
     });
     const answer = data?.choices?.[0]?.message?.content;
     return typeof answer === "string" ? answer : "";

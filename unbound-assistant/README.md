@@ -10,7 +10,9 @@ A standalone AI workspace inside this repository. It is separate from CloudForge
 - Sandboxed Python code execution through the Responses API Code Interpreter tool
 - Optional isolated Linux workspace through E2B for shell commands, source inspection, file uploads, and authorized binary analysis
 - Optional video generation through a configured Replicate model
-- Dedicated Chat, Image, Video, and Speech modes in the UI
+- Dedicated Chat, Image, Video, Speech, and Code / isolated Workspace modes in the UI
+- Live Workspace Dashboard with provider and integration configuration status
+- Selectable text-chat provider: OpenAI, Anthropic, Google Gemini, or a configured OpenAI-compatible HTTPS endpoint
 - Browser-local chat history and user-controlled memory notes
 - Read-only GitHub repository inspection through a fine-grained token (optional)\n- Agent tool loop for connected GitHub reads and isolated sandbox commands\n- Server-side provider keys (never exposed in frontend code)
 - App-password protection for provider-backed endpoints
@@ -40,6 +42,13 @@ Keep `.env` private. Never commit provider tokens, paste them into chat, or put 
 | `OPENAI_API_KEY` | For chat and images | Server-side key for the OpenAI API |
 | `APP_ACCESS_PASSWORD` | Yes | Shared app password, minimum 16 characters |
 | `OPENAI_MODEL` | No | Chat model; defaults to `gpt-5` |
+| `ANTHROPIC_API_KEY` | Optional | Enables Anthropic text chat and security tests |
+| `ANTHROPIC_MODEL` | No | Anthropic model; defaults to `claude-sonnet-4-5` |
+| `GEMINI_API_KEY` | Optional | Enables Google Gemini text chat and security tests |
+| `GEMINI_MODEL` | No | Gemini model; defaults to `gemini-2.5-flash` |
+| `AI_COMPAT_BASE_URL` | Optional | HTTPS base URL for an OpenAI-compatible chat API |
+| `AI_COMPAT_MODEL` | With compatible URL | Model name for that endpoint |
+| `AI_COMPAT_API_KEY` | No | Optional key for the compatible endpoint |
 | `OPENAI_IMAGE_MODEL` | No | Image model; defaults to `gpt-image-2` |
 | `OPENAI_AUDIO_MODEL` | No | Text-to-speech model; defaults to `gpt-4o-mini-tts` |
 | `OPENAI_TRANSCRIBE_MODEL` | No | Audio transcription model; defaults to `gpt-transcribe` |
@@ -102,5 +111,9 @@ Type `Remember: I prefer step-by-step answers` in Chat mode to save a note. Use 
 4. Add authorized GitHub integration so users can explicitly select repositories and review proposed changes.
 5. Add provider adapters for more image/video/audio models and model-specific parameters.
 6. Add durable media storage, background jobs, deployment checks, and usage metering.
+
+## Multi-provider text chat
+
+Open the Dashboard to refresh the list of configured providers, then choose a text model from the **Text model** selector. The selection is saved in this browser. OpenAI chat retains the app\u2019s web search, Python code interpreter, and connected agent tools. Anthropic, Gemini, and OpenAI-compatible providers currently support text chat only in this selector; they do not inherit OpenAI-specific tools. Provider API access and billing must be configured with the provider directly.
 
 The assistant must only report actions as completed after the relevant tool/provider confirms success. No prompt can create capabilities that have not been connected or provisioned.
