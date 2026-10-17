@@ -83,6 +83,8 @@ app.get("/api/health", (_req, res) => {
       codeInterpreter: Boolean(process.env.OPENAI_API_KEY),
       isolatedWorkspace: Boolean(process.env.E2B_API_KEY),
       binaryAnalysis: Boolean(process.env.E2B_API_KEY),
+      githubRepositoryRead: Boolean(process.env.GITHUB_TOKEN),
+      agentTools: Boolean(process.env.E2B_API_KEY || process.env.GITHUB_TOKEN),
       shellTool: process.env.ENABLE_SHELL_TOOL === "true",
       videoGeneration: Boolean(process.env.REPLICATE_API_TOKEN && videoModel),
       videoProvider: process.env.REPLICATE_API_TOKEN && videoModel ? "Replicate" : null,
