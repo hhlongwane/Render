@@ -20,6 +20,8 @@ This is an extensible foundation, not a claim of unlimited or unrestricted abili
 
 ## Setup
 
+See [API-SETUP.md](./API-SETUP.md) for the exact credentials, where to obtain them, which features each enables, and which planned integrations are not connected yet.
+
 Requires Node.js 20 or newer.
 
 1. Copy `.env.example` to `.env`.
