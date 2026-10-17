@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
 import multer from "multer";
+import { Sandbox } from "e2b";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -80,6 +81,8 @@ app.get("/api/health", (_req, res) => {
       audioGeneration: Boolean(process.env.OPENAI_API_KEY),
       transcription: Boolean(process.env.OPENAI_API_KEY),
       codeInterpreter: Boolean(process.env.OPENAI_API_KEY),
+      isolatedWorkspace: Boolean(process.env.E2B_API_KEY),
+      binaryAnalysis: Boolean(process.env.E2B_API_KEY),
       shellTool: process.env.ENABLE_SHELL_TOOL === "true",
       videoGeneration: Boolean(process.env.REPLICATE_API_TOKEN && videoModel),
       videoProvider: process.env.REPLICATE_API_TOKEN && videoModel ? "Replicate" : null,
@@ -127,6 +130,72 @@ app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }
   } catch (error) {
     console.error("Chat request failed:", error?.message || error);
     res.status(500).json({ error: "The assistant request failed. Check server logs and try again." });
+  }
+});
+
+
+function validSandboxId(value) {
+  return typeof value === "string" && /^[a-zA-Z0-9_-]{6,100}$/.test(value);
+}
+
+async function connectWorkspace(sandboxId) {
+  if (!process.env.E2B_API_KEY) throw new Error("E2B_NOT_CONFIGURED");
+  if (sandboxId) {
+    if (!validSandboxId(sandboxId)) throw new Error("Invalid workspace ID.");
+    return Sandbox.connect(sandboxId);
+  }
+  return Sandbox.create({ timeoutMs: 5 * 60 * 1000 });
+}
+
+app.post("/api/workspace/create", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "workspace-create" }), requireAppPassword, async (_req, res) => {
+  try {
+    if (!process.env.E2B_API_KEY) return res.status(503).json({ error: "Isolated workspace is not connected. Add E2B_API_KEY in the server environment." });
+    const sandbox = await Sandbox.create({ timeoutMs: 5 * 60 * 1000 });
+    res.json({ sandboxId: sandbox.sandboxId, timeoutMs: 5 * 60 * 1000, provider: "E2B" });
+  } catch (error) {
+    console.error("Workspace creation failed:", error?.message || error);
+    res.status(502).json({ error: "Could not create an isolated workspace. Check the E2B key, account limits, and server logs." });
+  }
+});
+
+app.post("/api/workspace/run", rateLimit({ windowMs: 60 * 60_000, max: 30, name: "workspace-run" }), requireAppPassword, async (req, res) => {
+  try {
+    if (!process.env.E2B_API_KEY) return res.status(503).json({ error: "Isolated workspace is not connected. Add E2B_API_KEY in the server environment." });
+    const command = typeof req.body?.command === "string" ? req.body.command.trim().slice(0, 4000) : "";
+    if (!command) return res.status(400).json({ error: "Enter a command to run in the isolated workspace." });
+    const sandbox = await connectWorkspace(req.body?.sandboxId);
+    await sandbox.setTimeout(5 * 60 * 1000);
+    const result = await sandbox.commands.run(command, { timeoutMs: 120 * 1000 });
+    res.json({
+      sandboxId: sandbox.sandboxId,
+      stdout: String(result.stdout || "").slice(0, 20000),
+      stderr: String(result.stderr || "").slice(0, 12000),
+      exitCode: Number.isInteger(result.exitCode) ? result.exitCode : null,
+      provider: "E2B",
+      note: "Commands ran in an isolated cloud sandbox, not on the Render server."
+    });
+  } catch (error) {
+    if (error?.message === "E2B_NOT_CONFIGURED") return res.status(503).json({ error: "Isolated workspace is not connected. Add E2B_API_KEY in the server environment." });
+    console.error("Workspace command failed:", error?.message || error);
+    res.status(502).json({ error: "The isolated command failed or timed out. Check the command, workspace ID, E2B limits, and server logs." });
+  }
+});
+
+app.post("/api/workspace/upload", rateLimit({ windowMs: 60 * 60_000, max: 15, name: "workspace-upload" }), requireAppPassword, upload.single("file"), async (req, res) => {
+  try {
+    if (!process.env.E2B_API_KEY) return res.status(503).json({ error: "Isolated workspace is not connected. Add E2B_API_KEY in the server environment." });
+    if (!req.file) return res.status(400).json({ error: "Choose a file to upload to the isolated workspace." });
+    if (req.file.size > 20 * 1024 * 1024) return res.status(413).json({ error: "Workspace uploads are limited to 20 MB per file." });
+    const sandbox = await connectWorkspace(req.body?.sandboxId);
+    await sandbox.setTimeout(5 * 60 * 1000);
+    const safeName = path.basename(req.file.originalname || "upload.bin").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "upload.bin";
+    const target = "/home/user/" + safeName;
+    await sandbox.files.write(target, req.file.buffer);
+    res.json({ sandboxId: sandbox.sandboxId, path: target, filename: safeName, bytes: req.file.size, provider: "E2B" });
+  } catch (error) {
+    if (error?.message === "E2B_NOT_CONFIGURED") return res.status(503).json({ error: "Isolated workspace is not connected. Add E2B_API_KEY in the server environment." });
+    console.error("Workspace upload failed:", error?.message || error);
+    res.status(502).json({ error: "Could not upload the file to the isolated workspace. Check E2B configuration and server logs." });
   }
 });
 
