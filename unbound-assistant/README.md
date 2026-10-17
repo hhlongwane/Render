@@ -12,7 +12,7 @@ A standalone AI workspace inside this repository. It is separate from CloudForge
 - Optional video generation through a configured Replicate model
 - Dedicated Chat, Image, Video, and Speech modes in the UI
 - Browser-local chat history and user-controlled memory notes
-- Server-side provider keys (never exposed in frontend code)
+- Read-only GitHub repository inspection through a fine-grained token (optional)\n- Agent tool loop for connected GitHub reads and isolated sandbox commands\n- Server-side provider keys (never exposed in frontend code)
 - App-password protection for provider-backed endpoints
 - Per-IP in-memory request limits for chat, image, and video endpoints
 - Health endpoint that reports which integrations are configured
@@ -44,7 +44,7 @@ Keep `.env` private. Never commit provider tokens, paste them into chat, or put 
 | `OPENAI_AUDIO_MODEL` | No | Text-to-speech model; defaults to `gpt-4o-mini-tts` |
 | `OPENAI_TRANSCRIBE_MODEL` | No | Audio transcription model; defaults to `gpt-transcribe` |
 | `ENABLE_SHELL_TOOL` | No | Set to `true` only if your chosen model supports the hosted Responses shell tool; otherwise leave `false` |
-| `E2B_API_KEY` | For isolated workspace | Server-side E2B key; enables Code / reverse engineer mode |\n| `REPLICATE_API_TOKEN` | For video | Server-side Replicate token |
+| `E2B_API_KEY` | For isolated workspace | Server-side E2B key; enables Code / reverse engineer mode |\n| `GITHUB_TOKEN` | For repository inspection | Fine-grained GitHub token scoped to selected repositories, Metadata read and Contents read |\n| `REPLICATE_API_TOKEN` | For video | Server-side Replicate token |
 | `REPLICATE_VIDEO_MODEL` | For video | Currently available Replicate model slug in `owner/name` format |
 | `REPLICATE_VIDEO_DEFAULT_INPUT` | No | Optional JSON object for model-specific inputs such as aspect ratio or duration |
 | `PORT` | No | Server port; defaults to 3000 |
@@ -69,7 +69,7 @@ Chat requests now enable the Responses API Code Interpreter tool for sandboxed P
 
 If your selected OpenAI model supports the Responses API shell tool, set `ENABLE_SHELL_TOOL=true`. This gives the model a hosted command-line environment for coding tasks. It is not your Render service or GitHub repository by default, and should not be treated as a production workspace without explicit repository sync, checkpoints, resource limits, and auditing. Leave this off if the API rejects the tool for your chosen model.
 
-### Isolated coding and reverse-engineering workspace\n\nSet `E2B_API_KEY` in the server environment to enable **Code / reverse engineer** mode. It creates a temporary isolated Linux sandbox, executes shell commands there, and lets you upload a file for inspection. Try `pwd && ls -la`, or upload an authorized binary and run `file /home/user/filename` and `strings -n 8 /home/user/filename`. Commands are limited to 120 seconds; sandboxes expire after five minutes and are not a persistent project workspace. E2B usage may cost money. This sandbox does not bypass encryption or grant access to systems you do not have permission to inspect.\n\n### Video generation
+### GitHub repository inspection\n\nSet `GITHUB_TOKEN` to a fine-grained token limited to repositories Unbound may inspect. In Chat mode, the agent can discover accessible repositories, list project files, and read text source files. Start with Metadata read and Contents read. This integration is read-only; it does not push changes or bypass private-repository permissions.\n\n### Isolated coding and reverse-engineering workspace\n\nSet `E2B_API_KEY` in the server environment to enable **Code / reverse engineer** mode. It creates a temporary isolated Linux sandbox, executes shell commands there, and lets you upload a file for inspection. Try `pwd && ls -la`, or upload an authorized binary and run `file /home/user/filename` and `strings -n 8 /home/user/filename`. Commands are limited to 120 seconds; sandboxes expire after five minutes and are not a persistent project workspace. E2B usage may cost money. This sandbox does not bypass encryption or grant access to systems you do not have permission to inspect.\n\n### Video generation
 
 Select **Generate video** after configuring `REPLICATE_API_TOKEN` and `REPLICATE_VIDEO_MODEL`. Pick a currently available video model from your Replicate account/catalog and verify its expected input schema. The starter sends the prompt plus any fields in `REPLICATE_VIDEO_DEFAULT_INPUT`, which must be a JSON object. Use the input fields documented for your selected model (for example, aspect ratio or duration); models with unusual schemas may still need a model-specific adapter. The UI polls the job and displays the returned output when it is a playable URL.
 
@@ -80,7 +80,7 @@ Create a **Web Service** from this repository and set **Root Directory** to `unb
 - Build command: `npm install`
 - Start command: `npm start`
 
-Add the environment variables in the service's secret/environment settings. At minimum, set `OPENAI_API_KEY` and a strong `APP_ACCESS_PASSWORD`. Add the Replicate variables only if you want video generation. Add `E2B_API_KEY` if you want the isolated coding/reverse-engineering workspace. Enable the shell tool only after confirming support for your chosen API model. Do not publish provider secrets in GitHub.
+Add the environment variables in the service's secret/environment settings. At minimum, set `OPENAI_API_KEY` and a strong `APP_ACCESS_PASSWORD`. Add the Replicate variables only if you want video generation. Add `E2B_API_KEY` if you want the isolated coding/reverse-engineering workspace, and `GITHUB_TOKEN` if you want repository inspection. Enable the shell tool only after confirming support for your chosen API model. Do not publish provider secrets in GitHub.
 
 ## Memory
 
