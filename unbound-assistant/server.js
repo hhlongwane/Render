@@ -11,6 +11,7 @@ const videoModel = process.env.REPLICATE_VIDEO_MODEL || "";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable("x-powered-by");
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "12mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -43,8 +44,7 @@ Respect the model provider's applicable requirements. Do not claim to be ChatGPT
 const limits = new Map();
 function rateLimit({ windowMs, max, name }) {
   return (req, res, next) => {
-    const forwarded = req.headers["x-forwarded-for"];
-    const ip = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.socket.remoteAddress) || "unknown";
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
     const key = name + ":" + ip;
     const now = Date.now();
     const current = limits.get(key);
