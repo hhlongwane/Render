@@ -113,6 +113,7 @@ app.get("/api/health", (_req, res) => {
     accessControlConfigured: (process.env.APP_ACCESS_PASSWORD || "").length >= 16,
     capabilities: {
       chat: Boolean(process.env.OPENAI_API_KEY),
+      textChat: getConfiguredProviders().length > 0,
       webSearch: Boolean(process.env.OPENAI_API_KEY),
       imageGeneration: Boolean(process.env.OPENAI_API_KEY),
       imageEditing: Boolean(process.env.OPENAI_API_KEY),
