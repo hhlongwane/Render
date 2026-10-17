@@ -36,6 +36,8 @@
     .image-options.visible { display:flex; }
     .audio-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 8px 4px; }
     .audio-tools input { max-width:220px; color:var(--muted); font-size:12px; }
+    .image-edit-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 8px 4px; }
+    .image-edit-tools input { max-width:220px; color:var(--muted); font-size:12px; }
     .audio-tools button { background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:8px 10px; cursor:pointer; }
     .image-options label { color:var(--muted); font-size:12px; }
     .image-options select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px; }
@@ -73,6 +75,7 @@
     </section>
     <div class="composer">
       <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button><button class="smallbtn mode" type="button" data-mode="audio">Generate speech</button></div>
+      <div class="image-edit-tools"><label for="imageEditFile">Edit an image</label><input id="imageEditFile" type="file" accept="image/png,image/jpeg,image/webp"><button id="imageEditBtn" type="button">Apply prompt to image</button></div>
       <div class="audio-tools"><label for="audioFile">Transcribe audio</label><input id="audioFile" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg,.flac"><button id="transcribeBtn" type="button">Transcribe file</button></div>
       <div class="image-options" id="imageOptions"><label for="imageSize">Size</label><select id="imageSize"><option value="1024x1024">Square</option><option value="1536x1024">Landscape</option><option value="1024x1536">Portrait</option><option value="auto">Auto</option></select><label for="imageQuality">Quality</label><select id="imageQuality"><option value="medium">Medium</option><option value="high" selected>High</option></select></div>
       <form id="form">
@@ -95,6 +98,8 @@
   const imageQuality = document.querySelector("#imageQuality");
   const audioFile = document.querySelector("#audioFile");
   const transcribeBtn = document.querySelector("#transcribeBtn");
+  const imageEditFile = document.querySelector("#imageEditFile");
+  const imageEditBtn = document.querySelector("#imageEditBtn");
   const ACCESS_KEY = "unbound.access.v1";
   const welcome = document.querySelector("#welcome");
   const CHAT_KEY = "unbound.chat.v1";
@@ -310,6 +315,43 @@
       promptBox.focus();
     }
   }
+
+  imageEditBtn.addEventListener("click", async () => {
+    const file = imageEditFile.files && imageEditFile.files[0];
+    const prompt = promptBox.value.trim();
+    if (!file || busy) {
+      if (!file) alert("Choose an image to edit first.");
+      return;
+    }
+    if (!prompt) {
+      alert("Type the changes you want in the message box first.");
+      promptBox.focus();
+      return;
+    }
+    busy = true;
+    imageEditBtn.disabled = true;
+    const waiting = addMessage("assistant", "Editing " + file.name + "…");
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("prompt", prompt);
+      formData.append("size", imageSize.value);
+      formData.append("quality", imageQuality.value);
+      formData.append("format", "png");
+      const response = await authorizedFetch("/api/images/edit", { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Image editing failed.");
+      waiting.remove();
+      addMedia("image", data.image, data.revisedPrompt || prompt);
+      promptBox.value = "";
+    } catch (err) {
+      waiting.lastChild.textContent = "Error: " + (err.message || "Image editing failed.");
+      waiting.classList.add("media-error");
+    } finally {
+      busy = false;
+      imageEditBtn.disabled = false;
+    }
+  });
 
   transcribeBtn.addEventListener("click", async () => {
     const file = audioFile.files && audioFile.files[0];
