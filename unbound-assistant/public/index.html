@@ -32,6 +32,10 @@
     .media-result img,.media-result video { display:block; width:100%; max-height:70vh; object-fit:contain; border-radius:10px; background:#090a0e; }
     .media-caption { color:var(--muted); font-size:12px; margin-top:8px; overflow-wrap:anywhere; }
     .media-error { color:#fecaca; }
+    .image-options { display:none; gap:8px; align-items:center; margin:0 0 8px 4px; flex-wrap:wrap; }
+    .image-options.visible { display:flex; }
+    .image-options label { color:var(--muted); font-size:12px; }
+    .image-options select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px; }
     .message { max-width:86%; padding:14px 16px; border:1px solid var(--line); border-radius:16px; white-space:pre-wrap; overflow-wrap:anywhere; }
     .message.user { align-self:flex-end; background:#26392f; border-color:#3a5b49; }
     .message.assistant { align-self:flex-start; background:var(--panel); }
@@ -66,6 +70,7 @@
     </section>
     <div class="composer">
       <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button></div>
+      <div class="image-options" id="imageOptions"><label for="imageSize">Size</label><select id="imageSize"><option value="1024x1024">Square</option><option value="1536x1024">Landscape</option><option value="1024x1536">Portrait</option><option value="auto">Auto</option></select><label for="imageQuality">Quality</label><select id="imageQuality"><option value="medium">Medium</option><option value="high" selected>High</option><option value="max">Maximum</option></select></div>
       <form id="form">
         <textarea id="prompt" aria-label="Message" placeholder="Tell the assistant what you want to do… (or type Remember: followed by a note)" rows="1" required></textarea>
         <button id="send" type="submit">Send ↗</button>
@@ -81,6 +86,9 @@
   const status = document.querySelector("#status");
   const memoryBtn = document.querySelector("#memoryBtn");
   const accessBtn = document.querySelector("#accessBtn");
+  const imageOptions = document.querySelector("#imageOptions");
+  const imageSize = document.querySelector("#imageSize");
+  const imageQuality = document.querySelector("#imageQuality");
   const ACCESS_KEY = "unbound.access.v1";
   const welcome = document.querySelector("#welcome");
   const CHAT_KEY = "unbound.chat.v1";
@@ -179,6 +187,7 @@
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     });
+    imageOptions.classList.toggle("visible", mode === "image");
     promptBox.placeholder = mode === "image" ? "Describe the image to generate…" : mode === "video" ? "Describe the video to generate…" : "Tell the assistant what you want to do… (or type Remember: followed by a note)";
     send.textContent = mode === "image" ? "Create image" : mode === "video" ? "Create video" : "Send ↗";
   }
@@ -248,7 +257,7 @@
       if (chosenMode === "image") {
         const response = await authorizedFetch("/api/images", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: trimmed, size: "1024x1024", quality: "high", format: "png" })
+          body: JSON.stringify({ prompt: trimmed, size: imageSize.value, quality: imageQuality.value, format: "png" })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Image generation failed.");
