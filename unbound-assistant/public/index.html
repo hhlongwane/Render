@@ -171,6 +171,12 @@
       img.alt = caption || "AI-generated image";
       img.src = url;
       node.append(img);
+    } else if (kind === "audio") {
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.src = url;
+      audio.style.width = "100%";
+      node.append(audio);
     } else {
       const video = document.createElement("video");
       video.controls = true;
@@ -186,6 +192,7 @@
     node.scrollIntoView({ behavior: "smooth", block: "start" });
     return node;
   }
+
   function setMode(nextMode) {
     mode = ["chat", "image", "video", "audio"].includes(nextMode) ? nextMode : "chat";
     document.querySelectorAll("[data-mode]").forEach(button => {
@@ -273,6 +280,15 @@
         const url = await generateVideo(trimmed);
         waiting.remove();
         addMedia("video", url, trimmed);
+      } else if (chosenMode === "audio") {
+        const response = await authorizedFetch("/api/audio", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: trimmed, voice: "coral", instructions: "Speak naturally and clearly. This is AI-generated speech." })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Speech generation failed.");
+        waiting.remove();
+        addMedia("audio", data.audio, "Voice: " + data.voice + " · Model: " + data.model);
       } else {
         const response = await authorizedFetch("/api/chat", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -294,7 +310,36 @@
       promptBox.focus();
     }
   }
-  transcribeBtn.addEventListener("click", async () => {\n    const file = audioFile.files && audioFile.files[0];\n    if (!file || busy) { if (!file) alert("Choose an audio file first."); return; }\n    busy = true;\n    transcribeBtn.disabled = true;\n    const waiting = addMessage("assistant", "Transcribing " + file.name + "…");\n    try {\n      const formData = new FormData();\n      formData.append("file", file);\n      const response = await authorizedFetch("/api/transcribe", { method: "POST", body: formData });\n      const data = await response.json();\n      if (!response.ok) throw new Error(data.error || "Transcription failed.");\n      waiting.lastChild.textContent = data.text || "(No speech was detected.)";\n      messages.push({ role: "assistant", content: "Transcript of " + file.name + ":\\n" + (data.text || "") });\n      messages = messages.slice(-60);\n      saveStore();\n    } catch (err) {\n      waiting.lastChild.textContent = "Error: " + (err.message || "Transcription failed.");\n      waiting.classList.add("media-error");\n    } finally { busy = false; transcribeBtn.disabled = false; }\n  });\n  accessBtn.addEventListener("click", () => {
+
+  transcribeBtn.addEventListener("click", async () => {
+    const file = audioFile.files && audioFile.files[0];
+    if (!file || busy) {
+      if (!file) alert("Choose an audio file first.");
+      return;
+    }
+    busy = true;
+    transcribeBtn.disabled = true;
+    const waiting = addMessage("assistant", "Transcribing " + file.name + "…");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await authorizedFetch("/api/transcribe", { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Transcription failed.");
+      waiting.lastChild.textContent = data.text || "(No speech was detected.)";
+      messages.push({ role: "assistant", content: "Transcript of " + file.name + ":\n" + (data.text || "") });
+      messages = messages.slice(-60);
+      saveStore();
+    } catch (err) {
+      waiting.lastChild.textContent = "Error: " + (err.message || "Transcription failed.");
+      waiting.classList.add("media-error");
+    } finally {
+      busy = false;
+      transcribeBtn.disabled = false;
+    }
+  });
+
+  accessBtn.addEventListener("click", () => {
     const entered = prompt("Enter the app access password. Leave blank to forget the saved password.");
     if (entered === null) return;
     if (!entered.trim()) localStorage.removeItem(ACCESS_KEY);
