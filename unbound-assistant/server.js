@@ -170,7 +170,7 @@ async function runAgentTool(name, args) {
     const data = await response.json();
     if (!response.ok) return { error: data?.message || "Could not read repository file.", status: response.status };
     if (data.type !== "file" || typeof data.content !== "string") return { error: "The requested path is not a regular file." };
-    const decoded = Buffer.from(data.content.replace(/\\n/g, ""), "base64");
+    const decoded = Buffer.from(data.content.replace(/\n/g, ""), "base64");
     if (decoded.includes(0)) return { error: "This appears to be a binary file. Upload an authorized sample to the isolated workspace for analysis." };
     return { repository: `${owner}/${repo}`, path: filePath, ref: ref || null, content: decoded.toString("utf8").slice(0, 24000), truncated: decoded.length > 24000 };
   }
