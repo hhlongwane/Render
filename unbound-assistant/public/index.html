@@ -16,6 +16,19 @@
     h1 { font-size:19px; margin:0; letter-spacing:-.4px; }
     .sub { color:var(--muted); font-size:12px; margin-top:2px; }
     .status { color:var(--muted); font-size:12px; text-align:right; }
+    .dashboard { margin:16px 0 4px; padding:16px; border:1px solid var(--line); border-radius:16px; background:rgba(23,26,35,.92); }
+    .dashboard[hidden] { display:none; }
+    .dashboard-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .dashboard-head h2 { margin:0; font-size:18px; }
+    .dashboard-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:10px; }
+    .dash-card { border:1px solid var(--line); border-radius:12px; padding:12px; min-width:0; background:#12151d; }
+    .dash-card strong { display:block; font-size:13px; margin-bottom:5px; }
+    .dash-card span { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+    .dash-status { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; color:var(--muted); }
+    .dash-dot { width:7px; height:7px; border-radius:50%; background:#fbbf24; display:inline-block; }
+    .dash-dot.ok { background:#6ee7b7; }
+    .dash-dot.off { background:#f87171; }
+    .dashboard-note { color:var(--muted); font-size:12px; margin:12px 0 0; }
     .tools { display:flex; gap:7px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
     .smallbtn { background:#1a1e29; color:var(--text); border:1px solid var(--line); border-radius:9px; padding:7px 10px; cursor:pointer; font-size:12px; }
     #feed { flex:1; padding:24px 0; display:flex; flex-direction:column; gap:16px; }
@@ -61,8 +74,13 @@
   <main class="shell">
     <header>
       <div class="brand"><div class="logo">U</div><div><h1>Unbound Assistant</h1><div class="sub">A separate AI workspace</div></div></div>
-      <div><div class="status" id="status">Checking connection…</div><div class="tools"><button class="smallbtn" id="accessBtn" type="button">Access</button><button class="smallbtn" id="memoryBtn" type="button">Memory (0)</button><button class="smallbtn" id="clearBtn" type="button">New chat</button></div></div>
+      <div><div class="status" id="status">Checking connection…</div><div class="tools"><button class="smallbtn" id="dashboardBtn" type="button" aria-expanded="false" aria-controls="dashboard">Dashboard</button><button class="smallbtn" id="accessBtn" type="button">Access</button><button class="smallbtn" id="memoryBtn" type="button">Memory (0)</button><button class="smallbtn" id="clearBtn" type="button">New chat</button></div></div>
     </header>
+    <section class="dashboard" id="dashboard" hidden aria-live="polite">
+      <div class="dashboard-head"><div><h2>Workspace dashboard</h2><div class="sub">Live configuration status · secrets are never shown</div></div><div><button class="smallbtn" id="refreshDashboardBtn" type="button">Refresh status</button><button class="smallbtn" id="closeDashboardBtn" type="button">Close</button></div></div>
+      <div class="dashboard-grid" id="dashboardGrid"><div class="dash-card"><strong>Loading status…</strong><span>Checking server configuration</span></div></div>
+      <p class="dashboard-note" id="dashboardNote">A green status means the integration is configured, not that its provider has been live-tested. Provider API usage may incur charges.</p>
+    </section>
     <section id="feed" aria-live="polite">
       <div class="welcome" id="welcome">
         <h2>Think bigger.<br>Build from here.</h2>
@@ -77,7 +95,7 @@
       </div>
     </section>
     <div class="composer">
-      <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button><button class="smallbtn mode" type="button" data-mode="audio">Generate speech</button><button class="smallbtn mode" type="button" data-mode="workspace">Code / reverse engineer</button></div>
+      <div class="modebar" role="group" aria-label="Task mode"><button class="smallbtn mode active" type="button" data-mode="chat">Chat & research</button><button class="smallbtn mode" type="button" data-mode="image">Generate image</button><button class="smallbtn mode" type="button" data-mode="video">Generate video</button><button class="smallbtn mode" type="button" data-mode="audio">Generate speech</button><button class="smallbtn mode" type="button" data-mode="workspace">Code / reverse engineer</button><button class="smallbtn" id="securityLabBtn" type="button">Run security tests</button></div>
       <div class="workspace-tools" id="workspaceTools"><label for="workspaceFile">Upload source/binary</label><input id="workspaceFile" type="file"><button id="workspaceUploadBtn" type="button">Upload to sandbox</button><button id="workspaceNewBtn" type="button">New sandbox</button><span id="workspaceIdLabel">Sandbox starts on first command.</span></div>
       <div class="image-edit-tools"><label for="imageEditFile">Edit an image</label><input id="imageEditFile" type="file" accept="image/png,image/jpeg,image/webp"><button id="imageEditBtn" type="button">Apply prompt to image</button></div>
       <div class="audio-tools"><label for="audioFile">Transcribe audio</label><input id="audioFile" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg,.flac"><button id="transcribeBtn" type="button">Transcribe file</button></div>
@@ -96,6 +114,10 @@
   const send = document.querySelector("#send");
   const status = document.querySelector("#status");
   const memoryBtn = document.querySelector("#memoryBtn");
+  const dashboardBtn = document.querySelector("#dashboardBtn");
+  const dashboard = document.querySelector("#dashboard");
+  const dashboardGrid = document.querySelector("#dashboardGrid");
+  const dashboardNote = document.querySelector("#dashboardNote");
   const accessBtn = document.querySelector("#accessBtn");
   const imageOptions = document.querySelector("#imageOptions");
   const imageSize = document.querySelector("#imageSize");
@@ -210,7 +232,7 @@
   }
 
   function setMode(nextMode) {
-    mode = ["chat", "image", "video", "audio"].includes(nextMode) ? nextMode : "chat";
+    mode = ["chat", "image", "video", "audio", "workspace"].includes(nextMode) ? nextMode : "chat";
     document.querySelectorAll("[data-mode]").forEach(button => {
       const active = button.dataset.mode === mode;
       button.classList.toggle("active", active);
@@ -283,7 +305,7 @@
     const chosenMode = mode;
     addMessage("user", trimmed);
     promptBox.value = "";
-    const waiting = addMessage("assistant", chosenMode === "image" ? "Creating your image…" : chosenMode === "video" ? "Starting video generation…" : chosenMode === "audio" ? "Generating speech audio…" : chosenMode === "workspace" ? "Running command in isolated cloud workspace…" : "Thinking…");
+    const waiting = addMessage("assistant", chosenMode === "image" ? "Creating your image…" : chosenMode === "video" ? "Starting video generation…" : chosenMode === "audio" ? "Generating speech audio…" : chosenMode === "workspace" ? "Running command in isolated cloud workspace…" : "Thinking…", false);
     try {
       if (chosenMode === "image") {
         const response = await authorizedFetch("/api/images", {
@@ -341,6 +363,44 @@
     }
   }
 
+  const securityLabBtn = document.querySelector("#securityLabBtn");
+  securityLabBtn.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    securityLabBtn.disabled = true;
+    const waiting = addMessage("assistant", "Checking configured providers and running the controlled prompt-injection test suite…", false);
+    try {
+      const response = await authorizedFetch("/api/security/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Security evaluation failed.");
+      const lines = ["Security lab results", "Run: " + data.createdAt, ""];
+      for (const report of data.reports || []) {
+        lines.push(report.provider.label + " · " + report.provider.model);
+        lines.push("Pass: " + report.summary.pass + " | Fail: " + report.summary.fail + " | Review: " + report.summary.review + " | Errors: " + report.summary.error);
+        for (const item of report.results || []) {
+          lines.push("[" + item.status.toUpperCase() + "] " + item.title + " (" + item.durationMs + " ms)");
+          if (item.answer) lines.push("  Response: " + item.answer.replace(/\s+/g, " ").slice(0, 240));
+        }
+        lines.push("");
+      }
+      lines.push(data.note || "Results are indicative only, not proof of model security.");
+      waiting.lastChild.textContent = lines.join("\n");
+      messages.push({ role: "assistant", content: lines.join("\n") });
+      messages = messages.slice(-60);
+      saveStore();
+    } catch (err) {
+      waiting.lastChild.textContent = "Security lab error: " + (err.message || "Could not complete the tests.");
+      waiting.classList.add("media-error");
+    } finally {
+      busy = false;
+      securityLabBtn.disabled = false;
+    }
+  });
+
   imageEditBtn.addEventListener("click", async () => {
     const file = imageEditFile.files && imageEditFile.files[0];
     const prompt = promptBox.value.trim();
@@ -386,7 +446,7 @@
     }
     busy = true;
     transcribeBtn.disabled = true;
-    const waiting = addMessage("assistant", "Transcribing " + file.name + "…");
+    const waiting = addMessage("assistant", "Transcribing " + file.name + "…", false);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -414,7 +474,7 @@
     const file = workspaceFile.files && workspaceFile.files[0];
     if (!file || busy) { if (!file) alert("Choose a file first."); return; }
     busy = true; workspaceUploadBtn.disabled = true;
-    const waiting = addMessage("assistant", "Uploading " + file.name + " to isolated sandbox…");
+    const waiting = addMessage("assistant", "Uploading " + file.name + " to isolated sandbox…", false);
     try {
       const formData = new FormData(); formData.append("file", file); if (workspaceId) formData.append("sandboxId", workspaceId);
       const response = await authorizedFetch("/api/workspace/upload", { method: "POST", body: formData });
@@ -424,6 +484,68 @@
     } catch (err) { waiting.lastChild.textContent = "Error: " + (err.message || "Upload failed."); waiting.classList.add("media-error"); }
     finally { busy = false; workspaceUploadBtn.disabled = false; }
   });
+  async function loadDashboard() {
+    dashboardGrid.replaceChildren();
+    const loading = document.createElement("div"); loading.className = "dash-card";
+    loading.innerHTML = "<strong>Loading dashboard…</strong><span>Reading server health and configured providers.</span>";
+    dashboardGrid.append(loading);
+    try {
+      const healthResponse = await fetch("/api/health", { cache: "no-store" });
+      const health = await healthResponse.json();
+      if (!healthResponse.ok || !health.ok) throw new Error("Server health endpoint is unavailable.");
+      let providers = [];
+      let providerNote = "Provider list requires app access.";
+      try {
+        const modelsResponse = await authorizedFetch("/api/models", { cache: "no-store" });
+        const models = await modelsResponse.json();
+        if (modelsResponse.ok) { providers = Array.isArray(models.providers) ? models.providers : []; providerNote = providers.length ? providers.map(p => p.label + " (" + p.model + ")").join(" · ") : "No model provider credentials configured."; }
+        else providerNote = models.error || providerNote;
+      } catch (err) { providerNote = err.message || providerNote; }
+      const features = health.capabilities || {};
+      const cards = [
+        {title:"App server",detail:"Health endpoint responding",ok:health.ok},
+        {title:"App password",detail:health.accessControlConfigured ? "Password protection configured" : "Set APP_ACCESS_PASSWORD (16+ characters)",ok:health.accessControlConfigured},
+        {title:"Chat & research",detail:features.chat ? "OpenAI API key configured" : "Needs OPENAI_API_KEY",ok:features.chat},
+        {title:"Image generation/editing",detail:features.imageGeneration ? "Configured · " + (features.imageModel || "default image model") : "Needs OpenAI API key",ok:features.imageGeneration},
+        {title:"Speech & transcription",detail:features.audioGeneration ? "OpenAI audio API configured" : "Needs OpenAI API key",ok:features.audioGeneration},
+        {title:"Python code analysis",detail:features.codeInterpreter ? "Available through chat tools" : "Needs OpenAI API key",ok:features.codeInterpreter},
+        {title:"Isolated workspace",detail:features.isolatedWorkspace ? "E2B key configured" : "Needs E2B_API_KEY",ok:features.isolatedWorkspace},
+        {title:"GitHub read access",detail:features.githubRepositoryRead ? "Token configured; scope controls access" : "Optional · set GITHUB_TOKEN",ok:features.githubRepositoryRead},
+        {title:"Video generation",detail:features.videoGeneration ? "Replicate configured" : "Optional · needs Replicate token and model",ok:features.videoGeneration},
+        {title:"Security lab",detail:providers.length ? "Ready for controlled tests" : "Configure a model provider first",ok:providers.length>0}
+      ];
+      dashboardGrid.replaceChildren();
+      for (const card of cards) {
+        const node = document.createElement("div"); node.className = "dash-card";
+        const title = document.createElement("strong"); title.textContent = card.title;
+        const detail = document.createElement("span"); detail.textContent = card.detail;
+        const statusLine = document.createElement("div"); statusLine.className = "dash-status";
+        const dot = document.createElement("i"); dot.className = "dash-dot " + (card.ok ? "ok" : "off");
+        const statusText = document.createElement("span"); statusText.textContent = card.ok ? "Configured" : "Not configured";
+        statusLine.append(dot, statusText); node.append(title, detail, statusLine); dashboardGrid.append(node);
+      }
+      const providerCard = document.createElement("div"); providerCard.className = "dash-card";
+      const providerTitle = document.createElement("strong"); providerTitle.textContent = "Model providers";
+      const providerDetail = document.createElement("span"); providerDetail.textContent = providerNote;
+      providerCard.append(providerTitle, providerDetail); dashboardGrid.prepend(providerCard);
+      dashboardNote.textContent = "Active chat currently uses " + (health.model || "the configured OpenAI model") + ". Additional provider adapters currently power the security lab. Status is configuration-only; provider credentials and billing are managed in Render environment settings.";
+    } catch (err) {
+      dashboardGrid.replaceChildren();
+      const card = document.createElement("div"); card.className = "dash-card";
+      const title = document.createElement("strong"); title.textContent = "Dashboard unavailable";
+      const detail = document.createElement("span"); detail.textContent = err.message || "Could not read server status.";
+      card.append(title, detail); dashboardGrid.append(card);
+      dashboardNote.textContent = "Check that the app is deployed and /api/health is responding, then refresh status.";
+    }
+  }
+  dashboardBtn.addEventListener("click", async () => {
+    const opening = dashboard.hidden;
+    dashboard.hidden = !opening;
+    dashboardBtn.setAttribute("aria-expanded", String(opening));
+    if (opening) await loadDashboard();
+  });
+  document.querySelector("#refreshDashboardBtn").addEventListener("click", loadDashboard);
+  document.querySelector("#closeDashboardBtn").addEventListener("click", () => { dashboard.hidden = true; dashboardBtn.setAttribute("aria-expanded", "false"); });
   accessBtn.addEventListener("click", () => {
     const entered = prompt("Enter the app access password. Leave blank to forget the saved password.");
     if (entered === null) return;

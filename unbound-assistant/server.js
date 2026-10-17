@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
 import multer from "multer";
 import { Sandbox } from "e2b";
+import { getConfiguredProviders } from "./lib/model-router.js";
+import { evaluateProvider, listSecurityCases } from "./lib/security-lab.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -66,6 +68,42 @@ setInterval(() => {
   const now = Date.now();
   for (const [key, value] of limits) if (now >= value.resetAt) limits.delete(key);
 }, 60_000).unref();
+
+app.get("/api/models", requireAppPassword, (_req, res) => {
+  res.json({
+    providers: getConfiguredProviders().map(({ id, label, model }) => ({ id, label, model })),
+    note: "Only providers with server-side credentials/configuration are listed. API keys are never returned."
+  });
+});
+
+app.get("/api/security/cases", requireAppPassword, (_req, res) => {
+  res.json({ cases: listSecurityCases() });
+});
+
+app.post("/api/security/evaluate", rateLimit({ windowMs: 60 * 60_000, max: 5, name: "security-evaluate" }), requireAppPassword, async (req, res) => {
+  try {
+    const configured = getConfiguredProviders();
+    if (!configured.length) {
+      return res.status(503).json({ error: "No model providers are configured. Add credentials for OpenAI, Anthropic, Gemini, or an OpenAI-compatible endpoint in Render environment settings." });
+    }
+    const requested = Array.isArray(req.body?.providers) ? req.body.providers : configured.map(provider => provider.id);
+    const allowed = new Set(configured.map(provider => provider.id));
+    const selected = [...new Set(requested)].filter(id => allowed.has(id)).slice(0, 4);
+    if (!selected.length) return res.status(400).json({ error: "Choose at least one configured provider." });
+    const reports = [];
+    for (const providerId of selected) {
+      reports.push(await evaluateProvider(providerId));
+    }
+    res.json({
+      createdAt: new Date().toISOString(),
+      reports,
+      note: "This small regression suite tests prompt-injection resistance in controlled prompts. It does not jailbreak providers or establish that a model is secure."
+    });
+  } catch (error) {
+    console.error("Security evaluation failed:", error?.message || error);
+    res.status(500).json({ error: "Security evaluation failed. Check provider configuration and server logs." });
+  }
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({
