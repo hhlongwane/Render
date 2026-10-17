@@ -76,6 +76,11 @@ app.get("/api/health", (_req, res) => {
       chat: Boolean(process.env.OPENAI_API_KEY),
       webSearch: Boolean(process.env.OPENAI_API_KEY),
       imageGeneration: Boolean(process.env.OPENAI_API_KEY),
+      imageEditing: Boolean(process.env.OPENAI_API_KEY),
+      audioGeneration: Boolean(process.env.OPENAI_API_KEY),
+      transcription: Boolean(process.env.OPENAI_API_KEY),
+      codeInterpreter: Boolean(process.env.OPENAI_API_KEY),
+      shellTool: process.env.ENABLE_SHELL_TOOL === "true",
       videoGeneration: Boolean(process.env.REPLICATE_API_TOKEN && videoModel),
       videoProvider: process.env.REPLICATE_API_TOKEN && videoModel ? "Replicate" : null,
       imageModel
