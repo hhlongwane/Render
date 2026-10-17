@@ -248,7 +248,7 @@ app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }
       const conversationText = input.slice(-12).map(item => (item.role === "assistant" ? "Assistant" : "User") + ": " + item.content.slice(0, 6000)).join("\n\n").slice(-24000);
       try {
         const answer = await askProvider(requestedProvider, {
-          system: instructions,
+          system: instructions + "\n\nFor this provider request, no external tools are available. Do not claim to have browsed, executed commands, read files, or used integrations unless their results are present in the conversation.",
           prompt: conversationText,
           maxTokens: 1600
         });
