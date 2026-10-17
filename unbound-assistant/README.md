@@ -5,7 +5,9 @@ A standalone AI workspace inside this repository. It is separate from CloudForge
 ## What works in this starter
 
 - Chat powered by the OpenAI Responses API with web search
-- Image generation through the OpenAI Images API
+- Image generation and image editing through the OpenAI Images API
+- Speech generation and audio transcription through the OpenAI Audio API
+- Sandboxed Python code execution through the Responses API Code Interpreter tool
 - Optional video generation through a configured Replicate model
 - Dedicated Chat, Image, and Video modes in the UI
 - Browser-local chat history and user-controlled memory notes
@@ -35,7 +37,9 @@ Keep `.env` private. Never commit provider tokens, paste them into chat, or put 
 | `OPENAI_API_KEY` | For chat and images | Server-side key for the OpenAI API |
 | `APP_ACCESS_PASSWORD` | Yes | Shared app password, minimum 16 characters |
 | `OPENAI_MODEL` | No | Chat model; defaults to `gpt-5` |
-| `OPENAI_IMAGE_MODEL` | No | Image model; defaults to `gpt-image-2.5-flare` |
+| `OPENAI_IMAGE_MODEL` | No | Image model; defaults to `gpt-image-2` |
+| `OPENAI_AUDIO_MODEL` | No | Text-to-speech model; defaults to `gpt-4o-mini-tts` |
+| `OPENAI_TRANSCRIBE_MODEL` | No | Audio transcription model; defaults to `gpt-transcribe` |
 | `REPLICATE_API_TOKEN` | For video | Server-side Replicate token |
 | `REPLICATE_VIDEO_MODEL` | For video | Currently available Replicate model slug in `owner/name` format |
 | `REPLICATE_VIDEO_DEFAULT_INPUT` | No | Optional JSON object for model-specific inputs such as aspect ratio or duration |
@@ -44,6 +48,18 @@ Keep `.env` private. Never commit provider tokens, paste them into chat, or put 
 ### Image generation
 
 Select **Generate image**, describe the image, and submit. The server calls the OpenAI Images API. The default model and output format can be changed using server environment settings and the image route. Image API access may require account verification or billing configuration with the provider.
+
+### Image editing
+
+Choose a PNG, JPEG, or WEBP image in the **Edit an image** row, type the requested changes into the main message box, then select **Apply prompt to image**. This calls the OpenAI image edits endpoint. The original file is sent to the provider for that request; it is not stored in a persistent media library by this starter.
+
+### Speech and transcription
+
+Choose **Generate speech** to turn text into spoken MP3 audio. The UI labels the result as AI-generated speech. To transcribe an existing recording, choose an audio file in the **Transcribe audio** row and select **Transcribe file**. The transcription endpoint accepts files up to 25 MB; supported types depend on the provider. The default transcription model is `gpt-transcribe`.
+
+### Python code interpreter
+
+Chat requests now enable the Responses API Code Interpreter tool for sandboxed Python, calculations, and supported data/file analysis. This is not the same as a persistent development machine: it does not automatically give the assistant access to your GitHub repository, the Render filesystem, or arbitrary shell commands.
 
 ### Video generation
 
