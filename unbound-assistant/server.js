@@ -2,17 +2,19 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
+import multer from "multer";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const model = process.env.OPENAI_MODEL || "gpt-5";
-const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare";
+const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
 const videoModel = process.env.REPLICATE_VIDEO_MODEL || "";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "12mb" }));
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 app.use(express.static(path.join(__dirname, "public")));
 
 function requireAppPassword(req, res, next) {
@@ -142,6 +144,29 @@ app.post("/api/images", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "images
   } catch (error) {
     console.error("Image generation failed:", error?.message || error);
     res.status(500).json({ error: "Image generation failed. Check server logs and try again." });
+  }
+});
+
+app.post("/api/transcribe", rateLimit({ windowMs: 60 * 60_000, max: 10, name: "transcribe" }), requireAppPassword, upload.single("file"), async (req, res) => {
+  try {
+    if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Transcription is not connected. Add OPENAI_API_KEY to the server environment." });
+    if (!req.file) return res.status(400).json({ error: "Choose an audio file first." });
+    const allowed = new Set(["audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/m4a", "audio/wav", "audio/x-wav", "audio/webm", "audio/ogg", "audio/flac", "video/mp4"]);
+    if (!allowed.has(req.file.mimetype)) return res.status(400).json({ error: "Use a supported audio file such as MP3, MP4, M4A, WAV, WEBM, OGG, or FLAC." });
+    const form = new FormData();
+    form.append("file", new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname || "audio-upload");
+    form.append("model", process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-transcribe");
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: form
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || "Transcription failed." });
+    res.json({ text: data.text || "", model: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-transcribe" });
+  } catch (error) {
+    console.error("Transcription failed:", error?.message || error);
+    res.status(500).json({ error: "Transcription failed. Check server logs and try again." });
   }
 });
 
