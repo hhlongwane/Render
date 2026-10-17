@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { timingSafeEqual } from "node:crypto";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -12,6 +13,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.disable("x-powered-by");
 app.use(express.json({ limit: "12mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+function requireAppPassword(req, res, next) {
+  const expected = process.env.APP_ACCESS_PASSWORD || "";
+  if (expected.length < 16) {
+    return res.status(503).json({ error: "App access is not configured. Set APP_ACCESS_PASSWORD to a random secret of at least 16 characters in the server environment." });
+  }
+  const supplied = req.get("x-app-password") || "";
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Access password missing or incorrect. Use the Access button to enter it." });
+  }
+  next();
+}
 
 const baseInstructions = `You are Unbound, a capable general-purpose AI assistant designed to help users finish projects.
 Work like a thoughtful agent: clarify only when necessary, break complex requests into actionable steps,
@@ -54,6 +69,7 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     model,
     apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY),
+    accessControlConfigured: (process.env.APP_ACCESS_PASSWORD || "").length >= 16,
     capabilities: {
       chat: Boolean(process.env.OPENAI_API_KEY),
       webSearch: Boolean(process.env.OPENAI_API_KEY),
@@ -65,7 +81,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }), async (req, res) => {
+app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }), requireAppPassword, async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) {
       return res.status(503).json({ error: "Chat is not connected yet. Add OPENAI_API_KEY in your hosting environment settings." });
@@ -105,7 +121,7 @@ app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }
   }
 });
 
-app.post("/api/images", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "images" }), async (req, res) => {
+app.post("/api/images", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "images" }), requireAppPassword, async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Image generation is not connected. Add OPENAI_API_KEY to the server environment." });
     const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim().slice(0, 8000) : "";
@@ -129,7 +145,7 @@ app.post("/api/images", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "images
   }
 });
 
-app.post("/api/videos", rateLimit({ windowMs: 60 * 60_000, max: 3, name: "videos" }), async (req, res) => {
+app.post("/api/videos", rateLimit({ windowMs: 60 * 60_000, max: 3, name: "videos" }), requireAppPassword, async (req, res) => {
   try {
     if (!process.env.REPLICATE_API_TOKEN || !videoModel) {
       return res.status(503).json({ error: "Video generation needs REPLICATE_API_TOKEN and REPLICATE_VIDEO_MODEL configured on the server. Choose a currently available video model on Replicate." });
@@ -153,7 +169,7 @@ app.post("/api/videos", rateLimit({ windowMs: 60 * 60_000, max: 3, name: "videos
   }
 });
 
-app.get("/api/videos/:id", rateLimit({ windowMs: 60 * 60_000, max: 120, name: "video-poll" }), async (req, res) => {
+app.get("/api/videos/:id", rateLimit({ windowMs: 60 * 60_000, max: 120, name: "video-poll" }), requireAppPassword, async (req, res) => {
   try {
     if (!process.env.REPLICATE_API_TOKEN) return res.status(503).json({ error: "Video provider is not configured." });
     if (!/^[a-z0-9-]{6,}$/i.test(req.params.id)) return res.status(400).json({ error: "Invalid video job ID." });
