@@ -219,9 +219,6 @@ async function runAgentTool(name, args) {
 
 app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }), requireAppPassword, async (req, res) => {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({ error: "Chat is not connected yet. Add OPENAI_API_KEY in your hosting environment settings." });
-    }
     const messages = req.body?.messages;
     if (!Array.isArray(messages) || messages.length === 0 || messages.length > 60) {
       return res.status(400).json({ error: "Send between 1 and 60 conversation messages." });
@@ -267,6 +264,9 @@ app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }
         console.error("Alternate model provider failed:", requestedProvider, error?.message || error);
         return res.status(502).json({ error: "The selected provider request failed. Check its model name, account access, API quota, and server logs." });
       }
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(503).json({ error: "OpenAI is not configured. Select a configured alternate provider in the Text model menu, or add OPENAI_API_KEY in Render environment settings." });
     }
     const baseTools = [{ type: "web_search" }, { type: "code_interpreter", container: { type: "auto" } }];
     if (process.env.ENABLE_SHELL_TOOL === "true") baseTools.push({ type: "shell", environment: { type: "container_auto" } });
