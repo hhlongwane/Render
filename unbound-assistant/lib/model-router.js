@@ -67,8 +67,9 @@ export async function askProvider(providerId, { system, prompt }) {
     });
   } else if (providerId === "gemini") {
     const model = encodeURIComponent(provider.model);
-    data = await requestJson(`${provider.endpoint}/${model}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
+    data = await requestJson(`${provider.endpoint}/${model}:generateContent`, {
       method: "POST",
+      headers: { "x-goog-api-key": process.env.GEMINI_API_KEY },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: prompt }] }],
