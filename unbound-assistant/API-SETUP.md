@@ -87,7 +87,17 @@ Planned server environment variable:
 
 E2B can provide isolated Linux sandboxes, file operations, and command execution for coding agents. This would be used for a persistent project workspace that can install dependencies, edit files, run tests, and return logs without executing arbitrary code on the main web server. The current app's Code Interpreter is a separate, hosted Python sandbox and does not replace this full workspace.
 
-## 7. Optional: persistent generated-file storage (not wired up yet)
+## 7. Isolated coding and reverse-engineering workspace (implemented; key required)
+
+**Get an E2B API key:** https://e2b.dev/  
+**SDK documentation:** https://e2b.dev/docs/sdk-reference/js-sdk/v2.6.2/sandbox  
+**Add this server environment variable:** `E2B_API_KEY`
+
+With the key configured, the **Code / reverse engineer** mode creates an isolated Linux sandbox, runs shell commands there, and can upload a file for inspection. For example, upload an authorized sample binary and run `file /home/user/sample.bin`, `strings -n 8 /home/user/sample.bin`, or language-specific test commands. Sandboxes are temporary and automatically expire; this starter does not yet provide a durable project filesystem or automatic GitHub sync. The sandbox is separate from the Render web server. It can use the network, so inspect code and artifacts only when you have the right to analyze them. Keep provider keys out of sandbox commands and uploaded files.
+
+Each command has a 120-second timeout and the sandbox has a five-minute lifetime from creation/refresh. Uploads are limited to 20 MB. E2B usage may incur charges and is subject to account quotas.
+
+## 8. Optional: persistent generated-file storage (not wired up yet)
 
 **Create a bucket:** https://dash.cloudflare.com/  
 **R2 docs:** https://developers.cloudflare.com/r2/get-started/s3/
@@ -101,14 +111,14 @@ Planned environment variables:
 
 Use bucket-scoped Object Read & Write permissions. R2 can store generated images, videos, exports, uploaded project files, and downloadable artifacts so that results survive a browser refresh. The current app does not store generated media permanently.
 
-## 8. Optional: extra voices and speech tools (not wired up)
+## 9. Optional: extra voices and speech tools (not wired up)
 
 **Get a key:** https://elevenlabs.io/app/settings/api-keys  
 **Docs:** https://elevenlabs.io/docs/api-reference/authentication
 
 Planned variable: `ELEVENLABS_API_KEY`. This is optional because the current starter already uses OpenAI's speech API. Add ElevenLabs only if a specific voice, dubbing, or speech feature requires it.
 
-## 9. Deploy the currently implemented starter
+## 10. Deploy the currently implemented starter
 
 In your hosting provider's server environment/secret settings, set:
 1. `OPENAI_API_KEY`
