@@ -515,6 +515,7 @@
           providers = Array.isArray(models.providers) ? models.providers : [];
           providerNote = providers.length ? providers.map(p => p.label + " (" + p.model + ")").join(" · ") : "No model provider credentials configured.";
           providerSelect.replaceChildren();
+          providerSelect.disabled = false;
           if (providers.length) {
             for (const provider of providers) {
               const option = document.createElement("option");
@@ -522,7 +523,8 @@
               option.textContent = provider.label + " · " + provider.model;
               providerSelect.append(option);
             }
-            const preferred = providers.some(provider => provider.id === storedProvider) ? storedProvider : providers.some(provider => provider.id === "openai") ? "openai" : providers[0].id;
+            const preferredStored = localStorage.getItem(PROVIDER_KEY) || providerSelect.value;
+            const preferred = providers.some(provider => provider.id === preferredStored) ? preferredStored : providers.some(provider => provider.id === "openai") ? "openai" : providers[0].id;
             providerSelect.value = preferred;
             localStorage.setItem(PROVIDER_KEY, preferred);
           } else {
