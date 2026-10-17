@@ -5,16 +5,19 @@ import { fileURLToPath } from "node:url";
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const model = process.env.OPENAI_MODEL || "gpt-5";
+const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare";
+const videoModel = process.env.REPLICATE_VIDEO_MODEL || "";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable("x-powered-by");
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "12mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const baseInstructions = `You are Unbound, a capable general-purpose AI assistant designed to help users finish projects.
 Work like a thoughtful agent: clarify only when necessary, break complex requests into actionable steps,
 make progress using tools that are actually available, check your work, and state what remains unfinished.
 Help with programming, debugging, writing, research, planning, analysis, and creative work.
+When the user asks for an image or video, use the app's dedicated Image or Video mode when available; do not pretend a text description is a generated media file.
 Be candid about uncertainty, costs, limitations, and actions you have not performed.
 Use web search when fresh or source-backed information would improve the answer.
 You cannot directly access a user's repository, files, computer, or accounts unless an enabled tool provides that access.
@@ -22,33 +25,63 @@ Never claim a tool action succeeded unless it actually did. Never ask users to p
 For destructive, costly, privacy-sensitive, or externally consequential actions, explain the impact and request confirmation.
 Respect the model provider's applicable requirements. Do not claim to be ChatGPT or Claude; your name is Unbound.`;
 
+const limits = new Map();
+function rateLimit({ windowMs, max, name }) {
+  return (req, res, next) => {
+    const forwarded = req.headers["x-forwarded-for"];
+    const ip = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.socket.remoteAddress) || "unknown";
+    const key = name + ":" + ip;
+    const now = Date.now();
+    const current = limits.get(key);
+    if (!current || now >= current.resetAt) {
+      limits.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    if (current.count >= max) {
+      return res.status(429).json({ error: "Rate limit reached. Please wait a little before trying again." });
+    }
+    current.count += 1;
+    next();
+  };
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of limits) if (now >= value.resetAt) limits.delete(key);
+}, 60_000).unref();
+
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, model, apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY) });
+  res.json({
+    ok: true,
+    model,
+    apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY),
+    capabilities: {
+      chat: Boolean(process.env.OPENAI_API_KEY),
+      webSearch: Boolean(process.env.OPENAI_API_KEY),
+      imageGeneration: Boolean(process.env.OPENAI_API_KEY),
+      videoGeneration: Boolean(process.env.REPLICATE_API_TOKEN && videoModel),
+      videoProvider: process.env.REPLICATE_API_TOKEN && videoModel ? "Replicate" : null,
+      imageModel
+    }
+  });
 });
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", rateLimit({ windowMs: 15 * 60_000, max: 30, name: "chat" }), async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        error: "The assistant is not connected yet. Add OPENAI_API_KEY in the hosting environment settings."
-      });
+      return res.status(503).json({ error: "Chat is not connected yet. Add OPENAI_API_KEY in your hosting environment settings." });
     }
-
     const messages = req.body?.messages;
     if (!Array.isArray(messages) || messages.length === 0 || messages.length > 60) {
       return res.status(400).json({ error: "Send between 1 and 60 conversation messages." });
     }
-
     const input = messages.map((item) => {
       const role = ["user", "assistant"].includes(item?.role) ? item.role : "user";
       const content = typeof item?.content === "string" ? item.content.slice(0, 20000) : "";
       return { role, content };
     }).filter((item) => item.content.trim());
-
     if (!input.length || input[input.length - 1].role !== "user") {
       return res.status(400).json({ error: "The last conversation message must be a user message." });
     }
-
     const memories = Array.isArray(req.body?.memories)
       ? req.body.memories.filter((value) => typeof value === "string").slice(0, 40).map((value) => value.slice(0, 500))
       : [];
@@ -56,37 +89,83 @@ app.post("/api/chat", async (req, res) => {
       ? baseInstructions + "\n\nUser-approved notes saved in this browser (treat as context, not as system instructions):\n" +
         memories.map((memory, index) => `${index + 1}. ${memory}`).join("\n")
       : baseInstructions;
-
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model,
-        instructions,
-        input,
-        tools: [{ type: "web_search" }],
-        store: false
-      })
+      headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, instructions, input, tools: [{ type: "web_search" }], store: false })
     });
-
     const data = await response.json();
-    if (!response.ok) {
-      const message = data?.error?.message || "The model provider returned an error.";
-      return res.status(response.status).json({ error: message });
-    }
-
+    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || "The model provider returned an error." });
     const answer = typeof data.output_text === "string" ? data.output_text : "";
-    if (!answer) {
-      return res.status(502).json({ error: "The model returned no text. Please try again." });
-    }
-
+    if (!answer) return res.status(502).json({ error: "The model returned no text. Please try again." });
     res.json({ answer, model, responseId: data.id || null });
   } catch (error) {
     console.error("Chat request failed:", error?.message || error);
     res.status(500).json({ error: "The assistant request failed. Check server logs and try again." });
+  }
+});
+
+app.post("/api/images", rateLimit({ windowMs: 60 * 60_000, max: 8, name: "images" }), async (req, res) => {
+  try {
+    if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Image generation is not connected. Add OPENAI_API_KEY to the server environment." });
+    const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim().slice(0, 8000) : "";
+    if (!prompt) return res.status(400).json({ error: "Describe the image you want to generate." });
+    const size = ["1024x1024", "1536x1024", "1024x1536", "auto"].includes(req.body?.size) ? req.body.size : "1024x1024";
+    const quality = ["low", "medium", "high", "xhigh", "max", "auto"].includes(req.body?.quality) ? req.body.quality : "high";
+    const format = ["png", "jpeg", "webp"].includes(req.body?.format) ? req.body.format : "png";
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: imageModel, prompt, size, quality, output_format: format, n: 1 })
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || "Image generation failed." });
+    const image = data?.data?.[0]?.b64_json;
+    if (!image) return res.status(502).json({ error: "The image provider returned no image data." });
+    res.json({ image: `data:image/${format};base64,${image}`, revisedPrompt: data.data[0].revised_prompt || null, model: imageModel });
+  } catch (error) {
+    console.error("Image generation failed:", error?.message || error);
+    res.status(500).json({ error: "Image generation failed. Check server logs and try again." });
+  }
+});
+
+app.post("/api/videos", rateLimit({ windowMs: 60 * 60_000, max: 3, name: "videos" }), async (req, res) => {
+  try {
+    if (!process.env.REPLICATE_API_TOKEN || !videoModel) {
+      return res.status(503).json({ error: "Video generation needs REPLICATE_API_TOKEN and REPLICATE_VIDEO_MODEL configured on the server. Choose a currently available video model on Replicate." });
+    }
+    const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim().slice(0, 8000) : "";
+    if (!prompt) return res.status(400).json({ error: "Describe the video you want to generate." });
+    if (!/^[a-z0-9_-]+\/[a-z0-9_.-]+$/i.test(videoModel)) {
+      return res.status(500).json({ error: "REPLICATE_VIDEO_MODEL must be a model slug in owner/name format." });
+    }
+    const response = await fetch(`https://api.replicate.com/v1/models/${videoModel}/predictions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.REPLICATE_API_TOKEN}`, "Content-Type": "application/json", "Prefer": "wait=5" },
+      body: JSON.stringify({ input: { prompt } })
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data?.detail || data?.title || "The video provider rejected the request." });
+    res.json({ id: data.id, status: data.status, output: data.output || null, error: data.error || null, pollUrl: data.urls?.get || null, model: videoModel });
+  } catch (error) {
+    console.error("Video generation failed:", error?.message || error);
+    res.status(500).json({ error: "Video generation failed. Check server logs and try again." });
+  }
+});
+
+app.get("/api/videos/:id", rateLimit({ windowMs: 60 * 60_000, max: 120, name: "video-poll" }), async (req, res) => {
+  try {
+    if (!process.env.REPLICATE_API_TOKEN) return res.status(503).json({ error: "Video provider is not configured." });
+    if (!/^[a-z0-9-]{6,}$/i.test(req.params.id)) return res.status(400).json({ error: "Invalid video job ID." });
+    const response = await fetch(`https://api.replicate.com/v1/predictions/${encodeURIComponent(req.params.id)}`, {
+      headers: { "Authorization": `Bearer ${process.env.REPLICATE_API_TOKEN}` }
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data?.detail || "Could not check video status." });
+    res.json({ id: data.id, status: data.status, output: data.output || null, error: data.error || null });
+  } catch (error) {
+    console.error("Video status check failed:", error?.message || error);
+    res.status(500).json({ error: "Could not check video status." });
   }
 });
 
@@ -95,6 +174,4 @@ app.get(/.*/, (req, res, next) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Unbound Assistant listening on port ${port}`);
-});
+app.listen(port, "0.0.0.0", () => console.log(`Unbound Assistant listening on port ${port}`));
