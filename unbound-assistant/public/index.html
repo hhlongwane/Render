@@ -49,7 +49,7 @@
   <main class="shell">
     <header>
       <div class="brand"><div class="logo">U</div><div><h1>Unbound Assistant</h1><div class="sub">A separate AI workspace</div></div></div>
-      <div><div class="status" id="status">Checking connection…</div><div class="tools"><button class="smallbtn" id="memoryBtn" type="button">Memory (0)</button><button class="smallbtn" id="clearBtn" type="button">New chat</button></div></div>
+      <div><div class="status" id="status">Checking connection…</div><div class="tools"><button class="smallbtn" id="accessBtn" type="button">Access</button><button class="smallbtn" id="memoryBtn" type="button">Memory (0)</button><button class="smallbtn" id="clearBtn" type="button">New chat</button></div></div>
     </header>
     <section id="feed" aria-live="polite">
       <div class="welcome" id="welcome">
@@ -80,6 +80,8 @@
   const send = document.querySelector("#send");
   const status = document.querySelector("#status");
   const memoryBtn = document.querySelector("#memoryBtn");
+  const accessBtn = document.querySelector("#accessBtn");
+  const ACCESS_KEY = "unbound.access.v1";
   const welcome = document.querySelector("#welcome");
   const CHAT_KEY = "unbound.chat.v1";
   const MEMORY_KEY = "unbound.memories.v1";
@@ -99,9 +101,24 @@
     } catch { status.textContent = "Browser storage unavailable"; }
     memoryBtn.textContent = "Memory (" + memories.length + ")";
   }
+  async function authorizedFetch(url, options = {}) {
+    let key = localStorage.getItem(ACCESS_KEY) || "";
+    if (!key) {
+      key = prompt("Enter the app access password configured by the app owner.");
+      if (!key) throw new Error("App access password is required.");
+      localStorage.setItem(ACCESS_KEY, key);
+    }
+    const headers = Object.assign({}, options.headers || {}, { "x-app-password": key });
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+      localStorage.removeItem(ACCESS_KEY);
+      throw new Error("Access password was rejected. Tap Access and enter it again.");
+    }
+    return response;
+  }
   function checkHealth() {
     fetch("/api/health").then(r => r.json()).then(d => {
-      status.textContent = d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") : "Needs API key setup";
+      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") : "Needs API key setup";
     }).catch(() => { status.textContent = "Server connection unavailable"; });
   }
   function addMessage(role, content, persist = true) {
@@ -175,7 +192,7 @@
     return null;
   }
   async function generateVideo(promptText) {
-    const response = await fetch("/api/videos", {
+    const response = await authorizedFetch("/api/videos", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: promptText })
     });
@@ -187,7 +204,7 @@
       if (["failed", "canceled"].includes(job.status)) throw new Error(job.error || "The video provider could not complete this generation.");
       if (!job.id) break;
       await new Promise(resolve => setTimeout(resolve, 5000));
-      const poll = await fetch("/api/videos/" + encodeURIComponent(job.id));
+      const poll = await authorizedFetch("/api/videos/" + encodeURIComponent(job.id));
       job = await poll.json();
       if (!poll.ok) throw new Error(job.error || "Could not check video progress.");
     }
@@ -229,7 +246,7 @@
     const waiting = addMessage("assistant", chosenMode === "image" ? "Creating your image…" : chosenMode === "video" ? "Starting video generation…" : "Thinking…");
     try {
       if (chosenMode === "image") {
-        const response = await fetch("/api/images", {
+        const response = await authorizedFetch("/api/images", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: trimmed, size: "1024x1024", quality: "high", format: "png" })
         });
@@ -242,7 +259,7 @@
         waiting.remove();
         addMedia("video", url, trimmed);
       } else {
-        const response = await fetch("/api/chat", {
+        const response = await authorizedFetch("/api/chat", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages, memories })
         });
@@ -262,6 +279,14 @@
       promptBox.focus();
     }
   }
+  accessBtn.addEventListener("click", () => {
+    const entered = prompt("Enter the app access password. Leave blank to forget the saved password.");
+    if (entered === null) return;
+    if (!entered.trim()) localStorage.removeItem(ACCESS_KEY);
+    else localStorage.setItem(ACCESS_KEY, entered);
+    checkHealth();
+    status.textContent = entered.trim() ? "Access password saved in this browser" : "Access password cleared";
+  });
   memoryBtn.addEventListener("click", () => {
     const list = memories.length ? memories.map((m, i) => (i + 1) + ". " + m).join("\n") : "No saved memories yet.";
     const choice = prompt("Saved memories (stored only in this browser):\n\n" + list + "\n\nType a memory number to delete it, or type CLEAR to delete all saved memories. Cancel to close.");
