@@ -9,7 +9,7 @@ A standalone AI workspace inside this repository. It is separate from CloudForge
 - Speech generation and audio transcription through the OpenAI Audio API
 - Sandboxed Python code execution through the Responses API Code Interpreter tool
 - Optional video generation through a configured Replicate model
-- Dedicated Chat, Image, and Video modes in the UI
+- Dedicated Chat, Image, Video, and Speech modes in the UI
 - Browser-local chat history and user-controlled memory notes
 - Server-side provider keys (never exposed in frontend code)
 - App-password protection for provider-backed endpoints
@@ -40,6 +40,7 @@ Keep `.env` private. Never commit provider tokens, paste them into chat, or put 
 | `OPENAI_IMAGE_MODEL` | No | Image model; defaults to `gpt-image-2` |
 | `OPENAI_AUDIO_MODEL` | No | Text-to-speech model; defaults to `gpt-4o-mini-tts` |
 | `OPENAI_TRANSCRIBE_MODEL` | No | Audio transcription model; defaults to `gpt-transcribe` |
+| `ENABLE_SHELL_TOOL` | No | Set to `true` only if your chosen model supports the hosted Responses shell tool; otherwise leave `false` |
 | `REPLICATE_API_TOKEN` | For video | Server-side Replicate token |
 | `REPLICATE_VIDEO_MODEL` | For video | Currently available Replicate model slug in `owner/name` format |
 | `REPLICATE_VIDEO_DEFAULT_INPUT` | No | Optional JSON object for model-specific inputs such as aspect ratio or duration |
@@ -61,6 +62,10 @@ Choose **Generate speech** to turn text into spoken MP3 audio. The UI labels the
 
 Chat requests now enable the Responses API Code Interpreter tool for sandboxed Python, calculations, and supported data/file analysis. This is not the same as a persistent development machine: it does not automatically give the assistant access to your GitHub repository, the Render filesystem, or arbitrary shell commands.
 
+### Hosted shell tool (optional)
+
+If your selected OpenAI model supports the Responses API shell tool, set `ENABLE_SHELL_TOOL=true`. This gives the model a hosted command-line environment for coding tasks. It is not your Render service or GitHub repository by default, and should not be treated as a production workspace without explicit repository sync, checkpoints, resource limits, and auditing. Leave this off if the API rejects the tool for your chosen model.
+
 ### Video generation
 
 Select **Generate video** after configuring `REPLICATE_API_TOKEN` and `REPLICATE_VIDEO_MODEL`. Pick a currently available video model from your Replicate account/catalog and verify its expected input schema. The starter sends the prompt plus any fields in `REPLICATE_VIDEO_DEFAULT_INPUT`, which must be a JSON object. Use the input fields documented for your selected model (for example, aspect ratio or duration); models with unusual schemas may still need a model-specific adapter. The UI polls the job and displays the returned output when it is a playable URL.
@@ -72,7 +77,7 @@ Create a **Web Service** from this repository and set **Root Directory** to `unb
 - Build command: `npm install`
 - Start command: `npm start`
 
-Add the environment variables in the service's secret/environment settings. At minimum, set `OPENAI_API_KEY` and a strong `APP_ACCESS_PASSWORD`. Add the Replicate variables only if you want video generation. Do not publish provider secrets in GitHub.
+Add the environment variables in the service's secret/environment settings. At minimum, set `OPENAI_API_KEY` and a strong `APP_ACCESS_PASSWORD`. Add the Replicate variables only if you want video generation. Enable the shell tool only after confirming support for your chosen API model. Do not publish provider secrets in GitHub.
 
 ## Memory
 
