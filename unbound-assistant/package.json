@@ -2,7 +2,7 @@
   "name": "unbound-assistant",
   "version": "0.1.0",
   "private": true,
-  "description": "A standalone AI assistant with model-backed chat and optional web search.",
+  "description": "A standalone AI workspace with web research, image generation, and optional video generation.",
   "type": "module",
   "scripts": {
     "start": "node server.js",
