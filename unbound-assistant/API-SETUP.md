@@ -61,21 +61,15 @@ Planned server environment variables:
 
 Supabase would provide Postgres, Auth, and a place to store per-user chat history, memory notes, project records, task checkpoints, and usage records. It is not connected by the current starter yet; don't add these variables expecting the app to use them until the database/auth code and policies are implemented.
 
-## 5. Needed for real repository coding and GitHub changes (not wired up yet)
+## 5. Read-only GitHub repository inspection (implemented; token required)
 
-**Create a GitHub App:** https://github.com/settings/apps/new  
-**Docs:** https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/quickstart
+**Create a fine-grained token:** https://github.com/settings/personal-access-tokens/new  
+**Permission guidance:** https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens
 
-Planned credentials:
-- `GITHUB_APP_ID`
-- `GITHUB_PRIVATE_KEY` — PEM private key, server only
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET` — server only, if using the OAuth web authorization flow
-- `GITHUB_WEBHOOK_SECRET` — only if webhooks are configured
+Add this server environment variable:
+- `GITHUB_TOKEN` — fine-grained token, stored server-side only
 
-Install the app only on the repositories you want this AI to access. Start with repository metadata read, contents read/write, and pull-request read/write if you want it to create branches and propose reviewed changes. Add other permissions only for a feature that needs them. A user's existing ChatGPT/Codex authorization does not automatically authorize this separate app.
-
-The GitHub integration must be implemented before these variables do anything. The current app does not yet read or edit your repository through its own runtime.
+Limit the token to only the repositories Unbound should inspect. Start with **Metadata: read-only** and **Contents: read-only**. The chat agent can list repositories visible to the token, inspect repository trees, and read text files. When the E2B key is also configured, it can run tests and inspect uploaded samples in the isolated workspace. It does not yet push commits or open pull requests; write access is intentionally not enabled in this first integration. Your ChatGPT/Codex authorization does not automatically authorize this separate app.
 
 ## 6. Needed for a full isolated coding workspace (not wired up yet)
 
