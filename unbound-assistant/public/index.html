@@ -148,7 +148,7 @@
   }
   function checkHealth() {
     fetch("/api/health").then(r => r.json()).then(d => {
-      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") + (d.capabilities?.isolatedWorkspace ? " · sandbox ready" : "") : "Needs API key setup";
+      status.textContent = !d.accessControlConfigured ? "Needs app password setup" : d.apiKeyConfigured ? "Chat + images · " + d.model + (d.capabilities?.videoGeneration ? " · video ready" : "") + (d.capabilities?.isolatedWorkspace ? " · sandbox ready" : "") + (d.capabilities?.githubRepositoryRead ? " · GitHub connected" : "") : "Needs API key setup";
     }).catch(() => { status.textContent = "Server connection unavailable"; });
   }
   function addMessage(role, content, persist = true) {
