@@ -9,6 +9,7 @@ import { validateResearchRequest } from "./lib/policy.js";
 import { AuditLedger } from "./lib/audit.js";
 import { runMultiAgentAnalysis } from "./lib/llm.js";
 import { survivalBridgeStatus, getSurvivalStatus, analyzeWithSurvival } from "./lib/survival-bridge.js";
+import { getKevCatalog, getCveIntelligence } from "./lib/threat-intel.js";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, "public");
@@ -20,6 +21,7 @@ const audit = new AuditLedger();
 const MAX_BODY = 16 * 1024;
 const authAttempts = new Map();
 const analysisAttempts = new Map();
+const intelAttempts = new Map();
 function limited(map, key, max, windowMs) {
   const now = Date.now();
   const current = map.get(key);
@@ -115,6 +117,26 @@ async function handle(req, res) {
   if (url.pathname.startsWith("/api/")) {
     if (!authenticated(req)) return json(res, 401, { error: "Authentication required." });
 
+    if (req.method === "GET" && (url.pathname === "/api/intel/kev" || url.pathname.startsWith("/api/intel/cve/"))) {
+      const ip = req.socket.remoteAddress || "unknown";
+      if (limited(intelAttempts, ip, 12, 5 * 60 * 1000)) return json(res, 429, { error: "Threat-intelligence rate limit reached. Try again later." });
+      try {
+        if (url.pathname === "/api/intel/kev") {
+          const query = String(url.searchParams.get("q") || "").slice(0, 120);
+          const limit = Math.min(50, Math.max(1, Number.parseInt(url.searchParams.get("limit") || "25", 10) || 25));
+          const result = await getKevCatalog({ query, limit });
+          audit.append("intel.kev.retrieved", { query: query.slice(0, 80), returned: result.items.length, matches: result.matching_entries, publisher: "CISA" });
+          return json(res, 200, result);
+        }
+        const cveId = url.pathname.slice("/api/intel/cve/".length);
+        const result = await getCveIntelligence(cveId);
+        audit.append("intel.cve.retrieved", { cveId: result.cve_id, sources: result.sources.map(source => ({ publisher: source.publisher, status: source.status })) });
+        return json(res, result.vulnerability || result.exploitation_probability ? 200 : 502, result);
+      } catch (error) {
+        audit.append("intel.retrieval_failed", { route: url.pathname.startsWith("/api/intel/cve/") ? "cve" : "kev", reason: String(error?.message || "source error").slice(0, 160) });
+        return json(res, 502, { error: error?.message || "Public threat-intelligence retrieval failed." });
+      }
+    }
     if (req.method === "GET" && url.pathname === "/api/survival/status") {
       const local = survivalBridgeStatus();
       if (!local.configured) return json(res, 200, { ...local, connected: false });
