@@ -15,14 +15,16 @@ OMNISEC GENESIS is a controlled cybersecurity research workspace. This first imp
 - Session authentication using a server-side password and HMAC-signed, expiring token.
 - Content Security Policy and baseline security headers.
 - Hash-linked audit events and integrity verification.
+- Authenticated, rate-limited, read-only public threat-intelligence retrieval from CISA KEV, NIST NVD and FIRST EPSS, with source URLs, timestamps, schema validation and partial-source failure reporting.
+- Live intelligence dashboard for CISA KEV search and CVE enrichment.
 - Responsive dashboard for overview, research tasks, agents and audit events.
 - Automated unit tests.
 
 **Not implemented yet**
 - Continuous autonomous reasoning or independent model instances; the current multi-agent workflow uses one configured model in separate specialist roles.
-- Live external vulnerability-feed retrieval.
+- Broader live external threat-intelligence coverage beyond CISA KEV, NIST NVD and FIRST EPSS.
 - Persistent database storage.
-- Retrieval from live vulnerability/advisory feeds.
+- Retrieval from additional vendor and CERT advisory feeds with independent corroboration.
 - Real sandbox provisioning.
 - Source-code upload and static analysis.
 - Multi-user identity and role management.
@@ -67,7 +69,7 @@ This build supports research planning and defensive analysis only. It has no tar
 1. Add durable storage with tenant isolation and encrypted secrets.
 2. Add a provider abstraction for model-backed specialist analysis with strict tool allowlists.
 3. Add source-document ingestion with prompt-injection-resistant handling.
-4. Add sourced incident and vulnerability intelligence retrieval.
+4. Expand sourced incident and vulnerability intelligence retrieval to vendor advisories, CERT feeds and independent corroboration.
 5. Add disposable, network-isolated lab environments for defensive reproductions.
 6. Add tamper-evident external audit export and independent monitoring.
 7. Add benchmark suites, red-team evaluations and human-reviewed releases.
@@ -101,3 +103,12 @@ GENESIS does not retain a durable knowledge base. Its task and audit structures 
 ## Research and capability roadmap
 
 See [RESEARCH_AND_CAPABILITY_ROADMAP.md](RESEARCH_AND_CAPABILITY_ROADMAP.md) for the research synthesis, model/agent evaluation approach, safe authorised lab architecture, threat-intelligence source requirements, and staged implementation milestones. This is a roadmap, not a claim that live public-source retrieval or active lab testing is already implemented.
+
+
+## Live public threat intelligence (first retrieval milestone)
+
+The **Live intelligence** dashboard retrieves the CISA Known Exploited Vulnerabilities (KEV) catalog and enriches an individual CVE using NIST NVD and FIRST EPSS. The authenticated endpoints are `GET /api/intel/kev?q=...&limit=...` and `GET /api/intel/cve/CVE-YYYY-NNNN`. Requests are rate-limited; only exact HTTPS source hosts and paths are allowed; redirects are rejected; response size and time are bounded; malformed CVE IDs are rejected; and source failures are reported rather than silently treated as negative findings. Retrieval metadata and source status are recorded in the process audit ledger.
+
+CISA KEV entries indicate known exploitation in the wild; they do not establish that a user's system is affected. EPSS is a 30-day probability estimate, not proof of exploitation. NVD severity alone does not establish business risk. No system scanning or exploitation is performed. An optional `NVD_API_KEY` may be configured server-side to improve NVD request limits; never expose it to the browser or commit it.
+
+See [CLAUDE_CODE_PUBLIC_PATTERNS.md](CLAUDE_CODE_PUBLIC_PATTERNS.md) for a research-based mapping of Claude Code public features to independent GENESIS design patterns.
