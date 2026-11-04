@@ -8,6 +8,7 @@ import { createResearchTask } from "./lib/engine.js";
 import { validateResearchRequest } from "./lib/policy.js";
 import { AuditLedger } from "./lib/audit.js";
 import { runMultiAgentAnalysis } from "./lib/llm.js";
+import { survivalBridgeStatus, getSurvivalStatus, analyzeWithSurvival } from "./lib/survival-bridge.js";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, "public");
@@ -114,6 +115,37 @@ async function handle(req, res) {
   if (url.pathname.startsWith("/api/")) {
     if (!authenticated(req)) return json(res, 401, { error: "Authentication required." });
 
+    if (req.method === "GET" && url.pathname === "/api/survival/status") {
+      const local = survivalBridgeStatus();
+      if (!local.configured) return json(res, 200, { ...local, connected: false });
+      try {
+        const remote = await getSurvivalStatus();
+        audit.append("integration.survival.status_checked", { connected: true, modelMode: remote.model_mode });
+        return json(res, 200, { ...local, connected: true, remote });
+      } catch (error) {
+        audit.append("integration.survival.status_failed", { reason: String(error?.message || "connection error").slice(0, 160) });
+        return json(res, 502, { ...local, connected: false, error: error?.message || "Survival AI connection failed." });
+      }
+    }
+    if (req.method === "POST" && url.pathname === "/api/survival/analyze") {
+      try {
+        const data = await body(req);
+        const report = await analyzeWithSurvival(data);
+        audit.append("integration.survival.analysis_completed", {
+          domain: data.domain,
+          modelBacked: report.model_backed === true,
+          decision: report.decision,
+          executionAuthority: "none"
+        });
+        return json(res, 200, { report });
+      } catch (error) {
+        audit.append("integration.survival.analysis_failed", {
+          reason: String(error?.message || "analysis error").slice(0, 160)
+        });
+        const status = error?.code === "SURVIVAL_NOT_CONFIGURED" ? 503 : (error?.status || 502);
+        return json(res, status, { error: error?.message || "Survival AI analysis failed." });
+      }
+    }
     if (req.method === "GET" && url.pathname === "/api/agents") {
       return json(res, 200, { agents: AGENTS, divisions: DIVISIONS });
     }
