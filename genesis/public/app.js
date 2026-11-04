@@ -1,5 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 let token = sessionStorage.getItem("omnisec_token") || "";
+let activeTaskId = "";
 
 async function api(path, options = {}) {
   const headers = { "content-type": "application/json", ...(options.headers || {}) };
