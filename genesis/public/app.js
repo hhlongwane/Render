@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-let token = sessionStorage.getItem("omn​​isec_token") || "";
+let token = sessionStorage.getItem("omnisec_token") || "";
 
 async function api(path, options = {}) {
   const headers = { "content-type": "application/json", ...(options.headers || {}) };
@@ -8,7 +8,7 @@ async function api(path, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) {
     token = "";
-    sessionStorage.removeItem("omn​​isec_token");
+    sessionStorage.removeItem("omnisec_token");
     showLogin();
     throw new Error("Your session expired. Sign in again.");
   }
@@ -49,7 +49,7 @@ $("#login-form").addEventListener("submit", async (event) => {
   try {
     const data = await api("/api/session", { method: "POST", body: JSON.stringify({ password: $("#password").value }) });
     token = data.token;
-    sessionStorage.setItem("omn​​isec_token", token);
+    sessionStorage.setItem("omnisec_token", token);
     $("#password").value = "";
     showApp();
   } catch (error) {
@@ -58,7 +58,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 });
 $("#logout").addEventListener("click", () => {
   token = "";
-  sessionStorage.removeItem("omn​​isec_token");
+  sessionStorage.removeItem("omnisec_token");
   showLogin();
 });
 
