@@ -1,0 +1,69 @@
+# OMNISEC GENESIS — Foundation build
+
+OMNISEC GENESIS is a controlled cybersecurity research workspace. This first implementation provides a 45-agent registry, deterministic task routing, explicit scope/authorisation checks, a session gate, and a hash-linked in-memory audit ledger.
+
+## Current status
+
+**Implemented**
+- 45 specialist agent definitions across seven divisions.
+- Research task creation and domain-based agent routing.
+- Scope and explicit authorisation validation.
+- Refusal of requests involving evidence destruction, intrusion concealment, credential theft, or unauthorised access.
+- Session authentication using a server-side password and HMAC-signed, expiring token.
+- Content Security Policy and baseline security headers.
+- Hash-linked audit events and integrity verification.
+- Responsive dashboard for overview, research tasks, agents and audit events.
+- Automated unit tests.
+
+**Not implemented yet**
+- External LLM calls or actual autonomous reasoning.
+- Persistent database storage.
+- Retrieval from live vulnerability/advisory feeds.
+- Real sandbox provisioning.
+- Source-code upload and static analysis.
+- Multi-user identity and role management.
+- Production deployment and independent security review.
+
+The current agent engine creates research plans. It does not claim that 45 independent AI models are running.
+
+## Run locally
+
+Requires Node.js 20+.
+
+```bash
+cd genesis
+export OMNISEC_APP_PASSWORD='use-a-random-secret-at-least-16-characters'
+export OMNISEC_SESSION_SECRET='use-a-different-random-secret-at-least-32-characters'
+npm run check
+npm start
+```
+
+Open http://localhost:3030.
+
+For PowerShell, set the two variables with `$env:OMNISEC_APP_PASSWORD` and `$env:OMNISEC_SESSION_SECRET`.
+
+## Deploy as a separate Render service
+
+Create a new Web Service from this repository and set **Root Directory** to `genesis`.
+
+- Build command: `npm run check`
+- Start command: `npm start`
+- Add `OMNISEC_APP_PASSWORD` (at least 16 characters).
+- Add `OMNISEC_SESSION_SECRET` (at least 32 random characters).
+- Set `NODE_ENV=production`.
+
+Do not reuse credentials from other projects. Do not put secrets in GitHub or browser code. Task and audit data are currently in memory and will reset on restart; do not use this build for production or sensitive assessments.
+
+## Security boundaries
+
+This build supports research planning and defensive analysis only. It has no target scanner, exploit runner, stealth feature, log deletion, credential extraction, unrestricted shell, or mechanism for bypassing access controls. It does not connect to or test a target when a task is created.
+
+## Next milestones
+
+1. Add durable storage with tenant isolation and encrypted secrets.
+2. Add a provider abstraction for model-backed specialist analysis with strict tool allowlists.
+3. Add source-document ingestion with prompt-injection-resistant handling.
+4. Add sourced incident and vulnerability intelligence retrieval.
+5. Add disposable, network-isolated lab environments for defensive reproductions.
+6. Add tamper-evident external audit export and independent monitoring.
+7. Add benchmark suites, red-team evaluations and human-reviewed releases.
