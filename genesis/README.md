@@ -96,3 +96,8 @@ The handoff includes the research task scope, specialist summaries, and the inde
 GENESIS does not retain a durable knowledge base. Its task and audit structures are process-memory only and reset when the service restarts; model calls use `store: false`. The handoff is explicit and operator-triggered. It does not execute trades, alter positions, move funds, or bypass Survival AI's existing decision gates.
 
 **Current limitation:** GENESIS specialist analysis currently reasons over the user-supplied scope and notes. It does not autonomously browse, scan public systems, exploit targets, or discover private data. To make intelligence genuinely source-grounded, a future retrieval layer must ingest lawful public advisories, vendor disclosures and market data with timestamps, URLs, source identity and independent corroboration before forwarding claims as evidence.
+
+
+## Research and capability roadmap
+
+See [RESEARCH_AND_CAPABILITY_ROADMAP.md](RESEARCH_AND_CAPABILITY_ROADMAP.md) for the research synthesis, model/agent evaluation approach, safe authorised lab architecture, threat-intelligence source requirements, and staged implementation milestones. This is a roadmap, not a claim that live public-source retrieval or active lab testing is already implemented.
