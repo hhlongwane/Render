@@ -85,3 +85,14 @@ Configure these server-side environment variables on the GENESIS service:
 Never put the token in browser code or Git. Remote connections require HTTPS. After both branches are reviewed, merged and deployed, sign in to GENESIS, open **Survival AI**, and choose **Check connection**. The panel supports only trading, crypto and Shopify analysis and clearly reports when the upstream service is unavailable or running its local fallback.
 
 The bridge does not grant GENESIS trading execution, wallet signing, payment, account access, or code-deployment authority. Existing Survival AI risk gates and financial records remain authoritative. See the Survival AI repository's `docs/GENESIS_INTEGRATION.md` for the matching service setup.
+
+
+## GENESIS intelligence handoff to Survival AI
+
+After a GENESIS specialist analysis completes, the operator can explicitly send its report to Survival AI using **Ask Survival AI to assess this intelligence**. The operator chooses `trading` or `crypto`; the GENESIS server forwards a compact brief to Survival AI's existing analysis-only reasoner.
+
+The handoff includes the research task scope, specialist summaries, and the independent verifier's supported/disputed claims and evidence gaps. It labels the material as AI-derived and not independently sourced. Survival AI must treat it as a hypothesis, check it against its own market data and risk gates, and may return `WAIT` or `RESEARCH`. One GENESIS-generated brief is one evidence item from one source; it cannot satisfy the multi-source evidence thresholds for a paper test or prioritisation.
+
+GENESIS does not retain a durable knowledge base. Its task and audit structures are process-memory only and reset when the service restarts; model calls use `store: false`. The handoff is explicit and operator-triggered. It does not execute trades, alter positions, move funds, or bypass Survival AI's existing decision gates.
+
+**Current limitation:** GENESIS specialist analysis currently reasons over the user-supplied scope and notes. It does not autonomously browse, scan public systems, exploit targets, or discover private data. To make intelligence genuinely source-grounded, a future retrieval layer must ingest lawful public advisories, vendor disclosures and market data with timestamps, URLs, source identity and independent corroboration before forwarding claims as evidence.
