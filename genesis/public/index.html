@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d18">
+  <title>OMNISEC GENESIS</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="login" class="login-screen">
+    <div class="login-card">
+      <div class="brand-mark">O</div>
+      <p class="eyebrow">CYBER RESEARCH INTELLIGENCE</p>
+      <h1>OMNISEC <span>GENESIS</span></h1>
+      <p class="muted">Controlled research workspace · Foundation build 0.1.0</p>
+      <form id="login-form">
+        <label for="password">Workspace access password</label>
+        <input id="password" type="password" autocomplete="current-password" required minlength="16" placeholder="Enter workspace password">
+        <button class="primary" type="submit">Enter workspace</button>
+      </form>
+      <p id="login-error" class="error" role="alert"></p>
+      <p class="tiny">Requires OMNISEC_APP_PASSWORD and OMNISEC_SESSION_SECRET in the server environment.</p>
+    </div>
+  </div>
+
+  <div id="app" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark small">O</div><div><strong>OMNISEC</strong><span>GENESIS</span></div></div>
+      <div class="side-label">WORKSPACE</div>
+      <button class="nav active" data-view="overview">◈ <span>Overview</span></button>
+      <button class="nav" data-view="research">⌕ <span>Research tasks</span></button>
+      <button class="nav" data-view="agents">⠿ <span>Agent network</span></button>
+      <button class="nav" data-view="audit">▤ <span>Audit ledger</span></button>
+      <div class="sidebar-bottom">
+        <div class="status-dot"></div><span>Controlled research mode</span>
+        <button id="logout" class="logout">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">GENESIS CONTROL PLANE</p><h2 id="view-title">Overview</h2></div>
+        <div class="top-right"><span class="live-pill"><i></i> SYSTEM ONLINE</span><span class="version">v0.1.0</span></div>
+      </header>
+
+      <section id="view-overview" class="view">
+        <div class="hero">
+          <div><p class="eyebrow">STRATEGIC CYBER RESEARCH</p><h1>Understand the system.<br><em>Strengthen its security.</em></h1><p>Coordinate specialist agents, structure security research and verify findings inside controlled, authorised environments.</p></div>
+          <div class="hero-orb"><div class="orb-core">O</div><div class="orb-ring ring-one"></div><div class="orb-ring ring-two"></div></div>
+        </div>
+        <div class="stats">
+          <article class="stat"><span>REGISTERED AGENTS</span><strong id="stat-agents">45</strong><small>Across specialist divisions</small></article>
+          <article class="stat"><span>RESEARCH DIVISIONS</span><strong id="stat-divisions">7</strong><small>Coordinated expertise</small></article>
+          <article class="stat"><span>RESEARCH TASKS</span><strong id="stat-tasks">0</strong><small>Created in this session</small></article>
+          <article class="stat"><span>AUDIT INTEGRITY</span><strong id="stat-audit">—</strong><small id="audit-sub">Hash-chain verification</small></article>
+        </div>
+        <div class="section-head"><div><p class="eyebrow">COMMAND CENTRE</p><h3>Start a research task</h3></div><span class="subtle">No target is contacted</span></div>
+        <div class="launch-card">
+          <div class="launch-icon">⌁</div><div class="launch-copy"><h4>New controlled assessment</h4><p>Describe a security question, the authorised lab or supplied material, and the evidence you want analysed.</p></div>
+          <button class="primary" data-go="research">Create task <b>↗</b></button>
+        </div>
+        <div class="section-head"><div><p class="eyebrow">LATEST ACTIVITY</p><h3>Recent research</h3></div><button class="text-button" data-go="research">View all →</button></div>
+        <div id="recent-tasks" class="task-list empty">No research tasks yet.</div>
+        <div class="notice"><strong>Safety boundary</strong><span>GENESIS currently plans and routes defensive research. It does not scan public targets, exploit systems, execute shell commands, steal credentials or conceal activity.</span></div>
+      </section>
+
+      <section id="view-research" class="view hidden">
+        <div class="section-head"><div><p class="eyebrow">RESEARCH ORCHESTRATION</p><h3>Create a research task</h3><p class="muted">The first build generates an agent-routed research plan, not an automated intrusion.</p></div></div>
+        <form id="task-form" class="form-card">
+          <label for="objective">Research objective</label>
+          <textarea id="objective" required minlength="12" maxlength="1200" placeholder="Example: Review the security design of my test API, focusing on authentication, authorisation and input validation."></textarea>
+          <label for="scope">Authorised scope</label>
+          <input id="scope" required minlength="8" maxlength="800" placeholder="Example: My local demo API and source files supplied for this assessment">
+          <label for="notes">Evidence or context <span class="optional">optional</span></label>
+          <textarea id="notes" maxlength="5000" class="short" placeholder="Paste non-secret architecture notes, findings, code excerpts or test observations. Do not include passwords, API keys or personal data."></textarea>
+          <label class="check-row"><input id="authorised" type="checkbox" required><span>I own this environment or have explicit permission to assess the supplied material, and I understand this workspace does not contact targets.</span></label>
+          <button class="primary" type="submit">Generate research plan <b>→</b></button>
+          <p id="task-error" class="error" role="alert"></p>
+        </form>
+        <div id="task-result" class="result-panel hidden"></div>
+      </section>
+
+      <section id="view-agents" class="view hidden">
+        <div class="section-head"><div><p class="eyebrow">MULTI-AGENT INTELLIGENCE</p><h3>Agent network</h3><p class="muted">45 registered specialist roles across seven divisions.</p></div><input id="agent-search" class="search" placeholder="Search agents..."></div>
+        <div id="agent-groups" class="agent-groups"></div>
+      </section>
+
+      <section id="view-audit" class="view hidden">
+        <div class="section-head"><div><p class="eyebrow">ACCOUNTABILITY & INTEGRITY</p><h3>Audit ledger</h3><p class="muted">Append-only, hash-linked events for this running process.</p></div><button id="verify-audit" class="secondary">Verify chain</button></div>
+        <div id="audit-status" class="audit-status">Loading audit status…</div>
+        <div id="audit-events" class="audit-list"></div>
+      </section>
+
+      <footer><span>OMNISEC GENESIS · FOUNDATION BUILD</span><span>Controlled research · Evidence first · Human accountable</span></footer>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+</body>
+</html>
