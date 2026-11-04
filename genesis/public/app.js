@@ -98,7 +98,7 @@ $("#task-form").addEventListener("submit", async (event) => {
     const { task } = await api("/api/tasks", { method: "POST", body: JSON.stringify(payload) });
     activeTaskId = task.id;
     $("#task-result").classList.remove("hidden");
-    $("#task-result").innerHTML = `<p class="eyebrow">TASK CREATED · ${escapeHtml(task.id.slice(0, 8))}</p><h4>${escapeHtml(task.title)}</h4><p>${escapeHtml(task.result.summary)}</p><strong>Assigned specialists</strong><p>${task.assignedAgents.map(agent => escapeHtml(agent.name)).join(" · ")}</p><strong>Research workflow</strong><ol>${task.workflow.map(step => `<li>${escapeHtml(step.name)} — ${escapeHtml(step.description)}</li>`).join("")}</ol><strong>Current limitations</strong><ul>${task.result.limitations.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><button id="run-analysis" class="primary">Run AI multi-agent analysis →</button><div id="analysis-output"></div>`;
+    $("#task-result").innerHTML = `<p class="eyebrow">TASK CREATED · ${escapeHtml(task.id.slice(0, 8))}</p><h4>${escapeHtml(task.title)}</h4><p>${escapeHtml(task.result.summary)}</p><strong>Assigned specialists</strong><p>${task.assignedAgents.map(agent => escapeHtml(agent.name)).join(" · ")}</p><strong>Research workflow</strong><ol>${task.workflow.map(step => `<li>${escapeHtml(step.name)} — ${escapeHtml(step.description)}</li>`).join("")}</ol><strong>Current limitations</strong><ul>${task.result.limitations.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><button id="run-analysis" class="primary">Run AI multi-agent analysis →</button><div id="analysis-output"></div><div id="survival-handoff" class="form-card hidden"><label for="handoff-domain">Send this cyber-intelligence brief to Survival AI</label><select id="handoff-domain"><option value="trading">Traditional trading risk</option><option value="crypto">Crypto market risk</option></select><p class="tiny">GENESIS findings are AI-derived hypotheses, not verified market facts. Survival AI will independently assess them and may return WAIT or RESEARCH.</p><button id="send-handoff" class="secondary" type="button">Ask Survival AI to assess this intelligence →</button><div id="handoff-result"></div></div>`;
     $("#run-analysis").addEventListener("click", async () => {
       const button = $("#run-analysis");
       button.disabled = true;
@@ -107,6 +107,23 @@ $("#task-form").addEventListener("submit", async (event) => {
         const analysed = await api("/api/tasks/" + activeTaskId + "/analyze", { method: "POST", body: "{}" });
         const report = analysed.task.analysis;
         $("#analysis-output").innerHTML = `<h4>Specialist research</h4>${report.specialistReports.map(item => `<article class="audit-event"><strong>${escapeHtml(item.agentName)}</strong><pre>${escapeHtml(JSON.stringify(item.report, null, 2))}</pre></article>`).join("")}<h4>Independent verification</h4><pre>${escapeHtml(JSON.stringify(report.independentVerification, null, 2))}</pre><p class="tiny">${escapeHtml(report.disclaimer)}</p>`;
+        $("#survival-handoff").classList.remove("hidden");
+        $("#send-handoff").addEventListener("click", async () => {
+          const handoff = $("#send-handoff");
+          handoff.disabled = true;
+          handoff.textContent = "Survival AI is assessing the brief…";
+          $("#handoff-result").textContent = "";
+          try {
+            const assessed = await api("/api/tasks/" + activeTaskId + "/send-to-survival", {
+              method: "POST",
+              body: JSON.stringify({ domain: $("#handoff-domain").value })
+            });
+            const r = assessed.report;
+            $("#handoff-result").innerHTML = `<h4>Survival AI assessment: ${escapeHtml(r.decision)}</h4><p>${escapeHtml(r.summary)}</p><p><strong>Confidence:</strong> ${Math.round(Number(r.confidence || 0) * 100)}%</p><p><strong>Evidence:</strong> ${r.evidence_count} item(s) from ${r.independent_source_count} source(s). GENESIS report is currently AI-derived and not independently sourced.</p><p><strong>Risk flags</strong></p><ul>${(r.risk_flags || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p><strong>Evidence gaps</strong></p><ul>${(r.evidence_gaps || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p class="tiny">Execution allowed: no · Live money allowed: no</p>`;
+            toast("Survival AI assessed the GENESIS intelligence brief.");
+          } catch (error) { $("#handoff-result").textContent = error.message; }
+          finally { handoff.disabled = false; handoff.textContent = "Ask Survival AI to assess this intelligence →"; }
+        });
         button.textContent = "Analysis complete";
         toast("AI research and independent verification completed.");
         refreshOverview();
