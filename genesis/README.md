@@ -7,6 +7,9 @@ OMNISEC GENESIS is a controlled cybersecurity research workspace. This first imp
 **Implemented**
 - 45 specialist agent definitions across seven divisions.
 - Research task creation and domain-based agent routing.
+- Optional model-backed analysis using up to three specialist calls plus an independent verifier through the OpenAI Responses API.
+- Explicit user-triggered analysis; task creation itself does not spend model tokens.
+- Sign-in and analysis rate limits.
 - Scope and explicit authorisation validation.
 - Refusal of requests involving evidence destruction, intrusion concealment, credential theft, or unauthorised access.
 - Session authentication using a server-side password and HMAC-signed, expiring token.
@@ -16,7 +19,8 @@ OMNISEC GENESIS is a controlled cybersecurity research workspace. This first imp
 - Automated unit tests.
 
 **Not implemented yet**
-- External LLM calls or actual autonomous reasoning.
+- Continuous autonomous reasoning or independent model instances; the current multi-agent workflow uses one configured model in separate specialist roles.
+- Live external vulnerability-feed retrieval.
 - Persistent database storage.
 - Retrieval from live vulnerability/advisory feeds.
 - Real sandbox provisioning.
@@ -49,7 +53,7 @@ Create a new Web Service from this repository and set **Root Directory** to `gen
 - Build command: `npm run check`
 - Start command: `npm start`
 - Add `OMNISEC_APP_PASSWORD` (at least 16 characters).
-- Add `OMNISEC_SESSION_SECRET` (at least 32 random characters).
+- Add `OMNISEC_SESSION_SECRET` (at least 32 random characters). Add `OPENAI_API_KEY` and optionally `OPENAI_MODEL` to enable the user-triggered AI analysis feature. Each analysis uses up to four model requests and may incur provider charges.
 - Set `NODE_ENV=production`.
 
 Do not reuse credentials from other projects. Do not put secrets in GitHub or browser code. Task and audit data are currently in memory and will reset on restart; do not use this build for production or sensitive assessments.
