@@ -21,8 +21,28 @@ async function fetchJson(url, { fetchImpl = fetch, headers = {} } = {}) {
   if (!response.ok) throw new Error("Public source returned HTTP " + response.status + ".");
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("json")) throw new Error("Public source did not return JSON.");
-  const raw = await response.text();
-  if (Buffer.byteLength(raw, "utf8") > MAX_RESPONSE_BYTES) throw new Error("Public source response exceeded the configured size limit.");
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (declaredLength > MAX_RESPONSE_BYTES) throw new Error("Public source response exceeded the configured size limit.");
+  let raw = "";
+  if (response.body?.getReader) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error("Public source response exceeded the configured size limit.");
+      }
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+  } else {
+    raw = await response.text();
+    if (Buffer.byteLength(raw, "utf8") > MAX_RESPONSE_BYTES) throw new Error("Public source response exceeded the configured size limit.");
+  }
   try { return JSON.parse(raw); } catch { throw new Error("Public source returned invalid JSON."); }
 }
 
