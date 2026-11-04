@@ -36,11 +36,12 @@ function switchView(name) {
   document.querySelectorAll(".view").forEach(el => el.classList.add("hidden"));
   $("#view-" + name).classList.remove("hidden");
   document.querySelectorAll(".nav").forEach(el => el.classList.toggle("active", el.dataset.view === name));
-  $("#view-title").textContent = ({ overview: "Overview", research: "Research tasks", agents: "Agent network", audit: "Audit ledger", survival: "Survival AI" })[name];
+  $("#view-title").textContent = ({ overview: "Overview", research: "Research tasks", agents: "Agent network", audit: "Audit ledger", survival: "Survival AI", intelligence: "Live intelligence" })[name];
   if (name === "agents") loadAgents();
   if (name === "audit") loadAudit();
   if (name === "research") loadTasks();
   if (name === "survival") loadSurvivalStatus();
+  if (name === "intelligence") loadKev();
 }
 document.querySelectorAll(".nav").forEach(button => button.addEventListener("click", () => switchView(button.dataset.view)));
 document.querySelectorAll("[data-go]").forEach(button => button.addEventListener("click", () => switchView(button.dataset.go)));
@@ -138,6 +139,41 @@ $("#task-form").addEventListener("submit", async (event) => {
     refreshOverview();
   } catch (error) { $("#task-error").textContent = error.message; }
 });
+
+async function loadKev() {
+  const status = $("#intel-status");
+  const results = $("#intel-results");
+  status.textContent = "Retrieving the latest public CISA KEV catalog…";
+  results.innerHTML = "";
+  try {
+    const query = $("#intel-query").value.trim();
+    const data = await api("/api/intel/kev?q=" + encodeURIComponent(query) + "&limit=30");
+    status.textContent = "CISA catalog " + data.source.catalog_version + " · released " + data.source.date_released + " · " + data.total_catalog_entries + " total entries · " + data.matching_entries + " matches · retrieved " + new Date(data.source.retrieved_at).toLocaleString();
+    results.innerHTML = data.items.map(item => `<article class="audit-event"><strong>${escapeHtml(item.cve_id)} · ${escapeHtml(item.name)}</strong><small>${escapeHtml(item.vendor)} / ${escapeHtml(item.product)} · Added ${escapeHtml(item.date_added || "date unavailable")} · Due ${escapeHtml(item.due_date || "not stated")}</small><p>${escapeHtml(item.description)}</p><p><strong>Required action:</strong> ${escapeHtml(item.required_action || "Consult the vendor advisory.")}</p><small><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">CISA source ↗</a> · Ransomware campaign use: ${escapeHtml(item.ransomware_use || "not stated")}</small><button class="text-button intel-cve-button" data-cve="${escapeHtml(item.cve_id)}">Enrich with NVD + EPSS →</button></article>`).join("") || "No matching CISA KEV entries.";
+    results.querySelectorAll(".intel-cve-button").forEach(button => button.addEventListener("click", () => {
+      $("#intel-cve").value = button.dataset.cve;
+      loadCve();
+    }));
+  } catch (error) { status.textContent = error.message; }
+}
+async function loadCve() {
+  const id = $("#intel-cve").value.trim();
+  const panel = $("#intel-cve-result");
+  panel.classList.remove("hidden");
+  panel.textContent = "Querying NIST NVD and FIRST EPSS…";
+  try {
+    const data = await api("/api/intel/cve/" + encodeURIComponent(id));
+    const v = data.vulnerability;
+    const epss = data.exploitation_probability;
+    panel.innerHTML = `<p class="eyebrow">PUBLIC-SOURCE CVE ENRICHMENT · ${escapeHtml(data.cve_id)}</p>${v ? `<h4>${escapeHtml(v.cvss?.severity || "Severity unavailable")} ${v.cvss?.base_score ?? "—"} / 10</h4><p>${escapeHtml(v.description)}</p><p><strong>Status:</strong> ${escapeHtml(v.state || "not supplied")} · <strong>Published:</strong> ${escapeHtml(v.published || "unknown")} · <strong>Modified:</strong> ${escapeHtml(v.last_modified || "unknown")}</p><p><strong>Weaknesses:</strong> ${(v.weaknesses || []).map(escapeHtml).join(", ") || "not supplied"}</p><strong>Vendor and technical references</strong><ul>${(v.references || []).map(ref => `<li><a href="${escapeHtml(ref.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ref.url)}</a></li>`).join("")}</ul>` : "<p>NVD did not return a vulnerability record.</p>"}${epss ? `<p><strong>FIRST EPSS 30-day exploitation probability:</strong> ${(epss.probability_30_day * 100).toFixed(2)}% · Percentile ${(epss.percentile * 100).toFixed(1)}% · Score date ${escapeHtml(epss.score_date)}</p>` : "<p>EPSS score unavailable for this query.</p>"}<strong>Source status</strong><ul>${data.sources.map(source => `<li>${escapeHtml(source.publisher)}: ${escapeHtml(source.status)} — <a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">open source ↗</a></li>`).join("")}</ul><p class="tiny">Retrieved ${escapeHtml(data.retrieved_at)}. ${(data.limitations || []).map(escapeHtml).join(" ")}</p>${(data.errors || []).length ? `<p class="error">${data.errors.map(escapeHtml).join(" · ")}</p>` : ""}`;
+  } catch (error) { panel.textContent = error.message; }
+}
+$("#intel-search").addEventListener("click", loadKev);
+$("#intel-refresh").addEventListener("click", loadKev);
+$("#intel-query").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); loadKev(); } });
+$("#intel-cve-search").addEventListener("click", loadCve);
+$("#intel-cve").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); loadCve(); } });
+
 async function loadSurvivalStatus() {
   const status = $("#survival-status");
   status.textContent = "Checking Survival AI bridge…";
