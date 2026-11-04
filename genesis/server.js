@@ -166,7 +166,7 @@ async function handle(req, res) {
       });
       return json(res, 201, { task });
     }
-    const sendIntelMatch = url.pathname.match(/^\\/api\\/tasks\\/([a-f0-9-]+)\\/send-to-survival$/);
+    const sendIntelMatch = url.pathname.match(/^\/api\/tasks\/([a-f0-9-]+)\/send-to-survival$/);
     if (req.method === "POST" && sendIntelMatch) {
       const task = tasks.find(item => item.id === sendIntelMatch[1]);
       if (!task || !task.analysis) return json(res, 409, { error: "Complete GENESIS specialist analysis before sending an intelligence brief." });
