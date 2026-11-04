@@ -33,6 +33,7 @@
       <button class="nav" data-view="research">⌕ <span>Research tasks</span></button>
       <button class="nav" data-view="agents">⠿ <span>Agent network</span></button>
       <button class="nav" data-view="audit">▤ <span>Audit ledger</span></button>
+      <button class="nav" data-view="intelligence">◎ <span>Live intelligence</span></button>
       <button class="nav" data-view="survival">✧ <span>Survival AI</span></button>
       <div class="sidebar-bottom">
         <div class="status-dot"></div><span>Controlled research mode</span>
@@ -92,6 +93,23 @@
         <div class="section-head"><div><p class="eyebrow">ACCOUNTABILITY & INTEGRITY</p><h3>Audit ledger</h3><p class="muted">Append-only, hash-linked events for this running process.</p></div><button id="verify-audit" class="secondary">Verify chain</button></div>
         <div id="audit-status" class="audit-status">Loading audit status…</div>
         <div id="audit-events" class="audit-list"></div>
+      </section>
+
+      <section id="view-intelligence" class="view hidden">
+        <div class="section-head"><div><p class="eyebrow">PUBLIC THREAT INTELLIGENCE</p><h3>Live vulnerability intelligence</h3><p class="muted">Read-only retrieval from CISA KEV, NIST NVD and FIRST EPSS. Every result shows its source and retrieval time.</p></div><button id="intel-refresh" class="secondary">Refresh CISA catalog</button></div>
+        <div class="form-card">
+          <label for="intel-query">Search CISA Known Exploited Vulnerabilities</label>
+          <div class="inline-fields"><input id="intel-query" maxlength="120" placeholder="Vendor, product, CVE or vulnerability keyword"><button id="intel-search" class="primary" type="button">Search live catalog →</button></div>
+          <p class="tiny">CISA KEV identifies vulnerabilities known to have been exploited in the wild. A catalog entry does not mean your systems are affected.</p>
+          <div id="intel-status" class="audit-status">Not yet queried.</div>
+          <div id="intel-results" class="audit-list"></div>
+        </div>
+        <div class="form-card">
+          <label for="intel-cve">Look up a CVE in NIST NVD and FIRST EPSS</label>
+          <div class="inline-fields"><input id="intel-cve" maxlength="32" placeholder="CVE-2025-12345"><button id="intel-cve-search" class="secondary" type="button">Lookup CVE</button></div>
+          <div id="intel-cve-result" class="result-panel hidden"></div>
+        </div>
+        <div class="notice"><strong>Evidence limits</strong><span>Feeds are public-source evidence, not proof that an asset is vulnerable or compromised. EPSS is a forecast, not observed exploitation. GENESIS does not scan or contact the affected systems.</span></div>
       </section>
 
       <section id="view-survival" class="view hidden">
