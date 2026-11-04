@@ -166,6 +166,68 @@ async function handle(req, res) {
       });
       return json(res, 201, { task });
     }
+    const sendIntelMatch = url.pathname.match(/^\\/api\\/tasks\\/([a-f0-9-]+)\\/send-to-survival$/);
+    if (req.method === "POST" && sendIntelMatch) {
+      const task = tasks.find(item => item.id === sendIntelMatch[1]);
+      if (!task || !task.analysis) return json(res, 409, { error: "Complete GENESIS specialist analysis before sending an intelligence brief." });
+      try {
+        const data = await body(req);
+        const domain = String(data.domain || "").trim().toLowerCase();
+        if (!["trading", "crypto"].includes(domain)) return json(res, 400, { error: "Cyber-intelligence trade briefs support trading or crypto only." });
+        const verification = task.analysis.independentVerification || {};
+        const specialistFindings = task.analysis.specialistReports.map(item => ({
+          specialist: item.agentName,
+          summary: String(item.report?.summary || "").slice(0, 700),
+          findings: Array.isArray(item.report?.findings) ? item.report.findings.slice(0, 4).map(finding => ({
+            title: String(finding.title || "").slice(0, 180),
+            severity: String(finding.severity || "unclassified").slice(0, 32),
+            evidence: String(finding.evidence || "").slice(0, 500),
+            confidence: finding.confidence ?? null
+          })) : [],
+          unknowns: Array.isArray(item.report?.unknowns) ? item.report.unknowns.slice(0, 4) : []
+        }));
+        const brief = {
+          task_id: task.id,
+          objective: task.objective,
+          authorised_scope: task.scope,
+          provenance: "AI-generated GENESIS specialist analysis based only on user-supplied notes and scope. No external target was contacted. Claims are hypotheses until independently sourced.",
+          specialists: specialistFindings,
+          independent_verification: {
+            summary: String(verification.verification_summary || "").slice(0, 1000),
+            supported_findings: Array.isArray(verification.supported_findings) ? verification.supported_findings.slice(0, 6) : [],
+            disputed_claims: Array.isArray(verification.disputed_claims) ? verification.disputed_claims.slice(0, 6) : [],
+            missing_evidence: Array.isArray(verification.missing_evidence) ? verification.missing_evidence.slice(0, 8) : [],
+            overall_confidence: verification.overall_confidence ?? null
+          }
+        };
+        const evidence = [{
+          id: "genesis-" + task.id,
+          source: "GENESIS AI-derived cyber research brief (not independently sourced)",
+          summary: JSON.stringify(brief).slice(0, 12000),
+          timestamp: task.analysis.completedAt
+        }];
+        const report = await analyzeWithSurvival({
+          domain,
+          goal: "Assess whether this GENESIS cyber-research brief has defensible implications for " + domain + " market risk or opportunity. Treat AI-generated claims as unverified hypotheses unless independently sourced. Prefer WAIT or RESEARCH. Do not infer a trade from a cyber finding alone.",
+          evidence,
+          context: {
+            source_system: "OMNISEC GENESIS",
+            source_task_id: task.id,
+            provenance: brief.provenance,
+            verification: brief.independent_verification,
+            source_count: 1,
+            evidence_status: "AI-derived; external source verification required",
+            execution_authority: "none"
+          }
+        });
+        audit.append("integration.genesis_intelligence.forwarded", { taskId: task.id, domain, decision: report.decision, executionAuthority: "none" });
+        return json(res, 200, { report, provenance: brief.provenance });
+      } catch (error) {
+        audit.append("integration.genesis_intelligence.failed", { taskId: task.id, reason: String(error?.message || "analysis error").slice(0, 160) });
+        const status = error?.code === "SURVIVAL_NOT_CONFIGURED" ? 503 : (error?.status || 502);
+        return json(res, status, { error: error?.message || "Unable to forward intelligence to Survival AI." });
+      }
+    }
     const analyzeMatch = url.pathname.match(/^\/api\/tasks\/([a-f0-9-]+)\/analyze$/);
     if (req.method === "POST" && analyzeMatch) {
       const ip = req.socket.remoteAddress || "unknown";
