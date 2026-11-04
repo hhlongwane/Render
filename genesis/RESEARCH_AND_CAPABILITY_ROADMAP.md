@@ -100,7 +100,8 @@ Reject expired briefs, missing provenance, malformed source URLs, claims without
 - Current limitations: one configured model, limited specialist prompts, no autonomous source retrieval, in-memory GENESIS task/audit state.
 
 ### M1 — Evidence-grounded public threat intelligence
-- Allowlisted source connector for CISA KEV, NVD CVE API, vendor PSIRTs/advisories, CERT/CC and trusted public incident reports.
+- **Partially implemented on the GENESIS draft branch:** authenticated read-only CISA KEV catalog search plus NIST NVD and FIRST EPSS CVE enrichment, with publisher URLs, publication/score dates, retrieval timestamps, allowlisted HTTPS endpoints, time/size bounds, rate limits and partial-source error reporting.
+- Remaining: vendor PSIRTs/advisories, CERT/CC and trusted public incident reports, source independence scoring and corroboration.
 - Deduplication by CVE/advisory ID and canonical URL.
 - Source timestamps and provenance; no scraped page instructions can alter policy.
 - Human review for low-confidence or conflicting claims.
@@ -159,3 +160,4 @@ Do not call GENESIS production-ready until:
 ## Research limitations
 
 This roadmap is a synthesis of public documentation and paper metadata, not a full reproduction of every benchmark. Some papers are preprints and their claims require independent replication. No third-party model weights or proprietary source code are copied into GENESIS. Before implementing a framework or benchmark, check its current release, license, security posture and dependency chain.
+\n\n## Implementation update — 4 November 2026\n\nThe first M1 slice has been added to the separate GENESIS draft branch. See `USE_LIVE_INTELLIGENCE.md` for the Render deployment and operator walkthrough. It is saved but not merged or deployed. The latest commit still requires CI confirmation; no green check is claimed for the newest code. The matching Survival AI bridge remains a separate draft PR.\n
