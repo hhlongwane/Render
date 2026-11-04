@@ -4,10 +4,12 @@
   "private": true,
   "description": "OMNISEC GENESIS controlled cybersecurity research platform",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node --check lib/agents.js && node --check lib/engine.js && node --check lib/policy.js && node --check lib/audit.js && node --check lib/llm.js && node --check lib/survival-bridge.js && node --check public/app.js && node --test test/*.test.js"
+    "check": "node --check server.js && node --check lib/agents.js && node --check lib/engine.js && node --check lib/policy.js && node --check lib/audit.js && node --check lib/llm.js && node --check lib/survival-bridge.js && node --check lib/threat-intel.js && node --check public/app.js && node --test test/*.test.js"
   }
 }
