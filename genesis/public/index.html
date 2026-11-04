@@ -33,6 +33,7 @@
       <button class="nav" data-view="research">⌕ <span>Research tasks</span></button>
       <button class="nav" data-view="agents">⠿ <span>Agent network</span></button>
       <button class="nav" data-view="audit">▤ <span>Audit ledger</span></button>
+      <button class="nav" data-view="survival">✧ <span>Survival AI</span></button>
       <div class="sidebar-bottom">
         <div class="status-dot"></div><span>Controlled research mode</span>
         <button id="logout" class="logout">Sign out</button>
@@ -91,6 +92,25 @@
         <div class="section-head"><div><p class="eyebrow">ACCOUNTABILITY & INTEGRITY</p><h3>Audit ledger</h3><p class="muted">Append-only, hash-linked events for this running process.</p></div><button id="verify-audit" class="secondary">Verify chain</button></div>
         <div id="audit-status" class="audit-status">Loading audit status…</div>
         <div id="audit-events" class="audit-list"></div>
+      </section>
+
+      <section id="view-survival" class="view hidden">
+        <div class="section-head"><div><p class="eyebrow">CONNECTED INTELLIGENCE</p><h3>Survival AI bridge</h3><p class="muted">Use Survival AI's trading, crypto and Shopify reasoning from this workspace. This connection is analysis-only.</p></div><button id="survival-refresh" class="secondary">Check connection</button></div>
+        <div id="survival-status" class="audit-status">Checking bridge configuration…</div>
+        <form id="survival-form" class="form-card">
+          <label for="survival-domain">Research domain</label>
+          <select id="survival-domain"><option value="trading">Traditional trading</option><option value="crypto">Crypto</option><option value="shopify">Shopify</option></select>
+          <label for="survival-goal">Research objective</label>
+          <textarea id="survival-goal" required minlength="1" maxlength="2000" placeholder="Describe the decision or opportunity you want Survival AI to analyse."></textarea>
+          <label for="survival-evidence">Evidence JSON <span class="optional">optional · array</span></label>
+          <textarea id="survival-evidence" class="short" placeholder='[{"id":"source-1","source":"Exchange","summary":"Timestamped market observation"}]'>[]</textarea>
+          <label for="survival-context">Context JSON <span class="optional">optional · object</span></label>
+          <textarea id="survival-context" class="short" placeholder='{"timeframe":"1h"}'>{}</textarea>
+          <p class="tiny">Do not include API keys, passwords, wallet seeds, broker tokens or private personal data. Survival AI cannot place trades, move funds or change account settings through this bridge.</p>
+          <button class="primary" type="submit">Run Survival AI analysis →</button>
+          <p id="survival-error" class="error" role="alert"></p>
+        </form>
+        <div id="survival-result" class="result-panel hidden"></div>
       </section>
 
       <footer><span>OMNISEC GENESIS · FOUNDATION BUILD</span><span>Controlled research · Evidence first · Human accountable</span></footer>
