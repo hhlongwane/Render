@@ -94,8 +94,26 @@ $("#task-form").addEventListener("submit", async (event) => {
   };
   try {
     const { task } = await api("/api/tasks", { method: "POST", body: JSON.stringify(payload) });
+    activeTaskId = task.id;
     $("#task-result").classList.remove("hidden");
-    $("#task-result").innerHTML = `<p class="eyebrow">TASK CREATED · ${escapeHtml(task.id.slice(0, 8))}</p><h4>${escapeHtml(task.title)}</h4><p>${escapeHtml(task.result.summary)}</p><strong>Assigned specialists</strong><p>${task.assignedAgents.map(agent => escapeHtml(agent.name)).join(" · ")}</p><strong>Research workflow</strong><ol>${task.workflow.map(step => `<li>${escapeHtml(step.name)} — ${escapeHtml(step.description)}</li>`).join("")}</ol><strong>Current limitations</strong><ul>${task.result.limitations.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+    $("#task-result").innerHTML = `<p class="eyebrow">TASK CREATED · ${escapeHtml(task.id.slice(0, 8))}</p><h4>${escapeHtml(task.title)}</h4><p>${escapeHtml(task.result.summary)}</p><strong>Assigned specialists</strong><p>${task.assignedAgents.map(agent => escapeHtml(agent.name)).join(" · ")}</p><strong>Research workflow</strong><ol>${task.workflow.map(step => `<li>${escapeHtml(step.name)} — ${escapeHtml(step.description)}</li>`).join("")}</ol><strong>Current limitations</strong><ul>${task.result.limitations.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><button id="run-analysis" class="primary">Run AI multi-agent analysis →</button><div id="analysis-output"></div>`;
+    $("#run-analysis").addEventListener("click", async () => {
+      const button = $("#run-analysis");
+      button.disabled = true;
+      button.textContent = "Analysing with specialist agents…";
+      try {
+        const analysed = await api("/api/tasks/" + activeTaskId + "/analyze", { method: "POST", body: "{}" });
+        const report = analysed.task.analysis;
+        $("#analysis-output").innerHTML = `<h4>Specialist research</h4>${report.specialistReports.map(item => `<article class="audit-event"><strong>${escapeHtml(item.agentName)}</strong><pre>${escapeHtml(JSON.stringify(item.report, null, 2))}</pre></article>`).join("")}<h4>Independent verification</h4><pre>${escapeHtml(JSON.stringify(report.independentVerification, null, 2))}</pre><p class="tiny">${escapeHtml(report.disclaimer)}</p>`;
+        button.textContent = "Analysis complete";
+        toast("AI research and independent verification completed.");
+        refreshOverview();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = "Run AI multi-agent analysis →";
+        $("#analysis-output").textContent = error.message;
+      }
+    });
     $("#task-form").reset();
     toast("Research plan created.");
     refreshOverview();
