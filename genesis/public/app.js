@@ -36,10 +36,11 @@ function switchView(name) {
   document.querySelectorAll(".view").forEach(el => el.classList.add("hidden"));
   $("#view-" + name).classList.remove("hidden");
   document.querySelectorAll(".nav").forEach(el => el.classList.toggle("active", el.dataset.view === name));
-  $("#view-title").textContent = ({ overview: "Overview", research: "Research tasks", agents: "Agent network", audit: "Audit ledger" })[name];
+  $("#view-title").textContent = ({ overview: "Overview", research: "Research tasks", agents: "Agent network", audit: "Audit ledger", survival: "Survival AI" })[name];
   if (name === "agents") loadAgents();
   if (name === "audit") loadAudit();
   if (name === "research") loadTasks();
+  if (name === "survival") loadSurvivalStatus();
 }
 document.querySelectorAll(".nav").forEach(button => button.addEventListener("click", () => switchView(button.dataset.view)));
 document.querySelectorAll("[data-go]").forEach(button => button.addEventListener("click", () => switchView(button.dataset.go)));
@@ -120,6 +121,43 @@ $("#task-form").addEventListener("submit", async (event) => {
     refreshOverview();
   } catch (error) { $("#task-error").textContent = error.message; }
 });
+async function loadSurvivalStatus() {
+  const status = $("#survival-status");
+  status.textContent = "Checking Survival AI bridge…";
+  try {
+    const data = await api("/api/survival/status");
+    if (!data.configured) status.textContent = "Not configured. Add SURVIVAL_AI_BASE_URL and SURVIVAL_AI_INTEGRATION_TOKEN to the GENESIS service environment.";
+    else if (!data.connected) status.textContent = "Bridge settings are present, but Survival AI is not reachable: " + (data.error || "connection failed");
+    else status.textContent = "Connected to Survival AI · " + data.remote.model_mode + " · durable research memory · no execution authority.";
+  } catch (error) { status.textContent = error.message; }
+}
+$("#survival-refresh").addEventListener("click", loadSurvivalStatus);
+$("#survival-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("#survival-error").textContent = "";
+  $("#survival-result").classList.add("hidden");
+  let evidence, context;
+  try {
+    evidence = JSON.parse($("#survival-evidence").value || "[]");
+    context = JSON.parse($("#survival-context").value || "{}");
+    if (!Array.isArray(evidence)) throw new Error("Evidence must be a JSON array.");
+    if (!context || typeof context !== "object" || Array.isArray(context)) throw new Error("Context must be a JSON object.");
+  } catch (error) { $("#survival-error").textContent = "Invalid JSON: " + error.message; return; }
+  const button = $("#survival-form button[type=submit]");
+  button.disabled = true;
+  button.textContent = "Running Survival AI analysis…";
+  try {
+    const result = await api("/api/survival/analyze", { method: "POST", body: JSON.stringify({
+      domain: $("#survival-domain").value, goal: $("#survival-goal").value, evidence, context
+    }) });
+    const report = result.report;
+    $("#survival-result").classList.remove("hidden");
+    $("#survival-result").innerHTML = `<p class="eyebrow">SURVIVAL AI · ${escapeHtml(report.domain)}</p><h4>${escapeHtml(report.decision)} · Confidence ${Math.round(Number(report.confidence || 0) * 100)}%</h4><p>${escapeHtml(report.summary)}</p><strong>Rationale</strong><p>${escapeHtml(report.rationale)}</p><strong>Risk flags</strong><ul>${(report.risk_flags || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><strong>Evidence gaps</strong><ul>${(report.evidence_gaps || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><strong>Next steps</strong><ul>${(report.next_steps || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p class="tiny">Model-backed: ${report.model_backed === true ? "yes" : "no"} · Execution authority: none · Live-money permission: false</p><details><summary>Full structured report</summary><pre>${escapeHtml(JSON.stringify(report, null, 2))}</pre></details>`;
+    toast("Survival AI analysis completed.");
+  } catch (error) { $("#survival-error").textContent = error.message; }
+  finally { button.disabled = false; button.textContent = "Run Survival AI analysis →"; }
+});
+
 let cachedAgents = [];
 async function loadAgents() {
   try {
