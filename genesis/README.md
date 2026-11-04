@@ -112,3 +112,6 @@ The **Live intelligence** dashboard retrieves the CISA Known Exploited Vulnerabi
 CISA KEV entries indicate known exploitation in the wild; they do not establish that a user's system is affected. EPSS is a 30-day probability estimate, not proof of exploitation. NVD severity alone does not establish business risk. No system scanning or exploitation is performed. An optional `NVD_API_KEY` may be configured server-side to improve NVD request limits; never expose it to the browser or commit it.
 
 See [CLAUDE_CODE_PUBLIC_PATTERNS.md](CLAUDE_CODE_PUBLIC_PATTERNS.md) for a research-based mapping of Claude Code public features to independent GENESIS design patterns.
+
+
+For step-by-step Render setup and use of the public threat-intelligence dashboard, see [USE_LIVE_INTELLIGENCE.md](USE_LIVE_INTELLIGENCE.md).
