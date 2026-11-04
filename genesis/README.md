@@ -71,3 +71,17 @@ This build supports research planning and defensive analysis only. It has no tar
 5. Add disposable, network-isolated lab environments for defensive reproductions.
 6. Add tamper-evident external audit export and independent monitoring.
 7. Add benchmark suites, red-team evaluations and human-reviewed releases.
+
+
+## Connect the separate Survival AI service
+
+The GENESIS dashboard includes an optional **Survival AI** workspace. It calls only the dedicated analysis-only integration API; it does not access broker, wallet, payment, order, or account-management endpoints.
+
+Configure these server-side environment variables on the GENESIS service:
+
+- `SURVIVAL_AI_BASE_URL=https://survival-ai-gmd5.onrender.com`
+- `SURVIVAL_AI_INTEGRATION_TOKEN`: the same dedicated random token configured as `SURVIVAL_AI_INTEGRATION_TOKEN` on the Survival AI service.
+
+Never put the token in browser code or Git. Remote connections require HTTPS. After both branches are reviewed, merged and deployed, sign in to GENESIS, open **Survival AI**, and choose **Check connection**. The panel supports only trading, crypto and Shopify analysis and clearly reports when the upstream service is unavailable or running its local fallback.
+
+The bridge does not grant GENESIS trading execution, wallet signing, payment, account access, or code-deployment authority. Existing Survival AI risk gates and financial records remain authoritative. See the Survival AI repository's `docs/GENESIS_INTEGRATION.md` for the matching service setup.
