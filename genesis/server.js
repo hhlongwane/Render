@@ -7,6 +7,7 @@ import { AGENTS, DIVISIONS } from "./lib/agents.js";
 import { createResearchTask } from "./lib/engine.js";
 import { validateResearchRequest } from "./lib/policy.js";
 import { AuditLedger } from "./lib/audit.js";
+import { runMultiAgentAnalysis } from "./lib/llm.js";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, "public");
@@ -16,6 +17,15 @@ const SESSION_SECRET = process.env.OMNISEC_SESSION_SECRET || "";
 const tasks = [];
 const audit = new AuditLedger();
 const MAX_BODY = 16 * 1024;
+const authAttempts = new Map();
+const analysisAttempts = new Map();
+function limited(map, key, max, windowMs) {
+  const now = Date.now();
+  const current = map.get(key);
+  if (!current || now >= current.resetAt) { map.set(key, { count: 1, resetAt: now + windowMs }); return false; }
+  current.count += 1;
+  return current.count > max;
+}
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml" };
 
 function json(res, status, data) {
@@ -84,6 +94,8 @@ async function handle(req, res) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/session") {
+    const ip = req.socket.remoteAddress || "unknown";
+    if (limited(authAttempts, ip, 8, 15 * 60 * 1000)) return json(res, 429, { error: "Too many sign-in attempts. Try again in 15 minutes." });
     const data = await body(req);
     if (APP_PASSWORD.length < 16 || SESSION_SECRET.length < 32) {
       return json(res, 503, { error: "Set OMNISEC_APP_PASSWORD (at least 16 characters) and OMNISEC_SESSION_SECRET (at least 32 characters) in the server environment." });
@@ -121,6 +133,23 @@ async function handle(req, res) {
         assignedAgentIds: task.assignedAgents.map(agent => agent.id)
       });
       return json(res, 201, { task });
+    }
+    const analyzeMatch = url.pathname.match(/^\\/api\\/tasks\\/([a-f0-9-]+)\\/analyze$/);
+    if (req.method === "POST" && analyzeMatch) {
+      const ip = req.socket.remoteAddress || "unknown";
+      if (limited(analysisAttempts, ip, 6, 60 * 60 * 1000)) return json(res, 429, { error: "Analysis rate limit reached. Try again later." });
+      const task = tasks.find(item => item.id === analyzeMatch[1]);
+      if (!task) return json(res, 404, { error: "Research task not found." });
+      try {
+        const report = await runMultiAgentAnalysis(task);
+        task.analysis = report;
+        task.status = "analysed";
+        audit.append("research.task.analysed", { taskId: task.id, model: report.model, specialistCount: report.specialistReports.length });
+        return json(res, 200, { task });
+      } catch (error) {
+        audit.append("research.task.analysis_failed", { taskId: task.id, reason: String(error?.message || "provider error").slice(0, 180) });
+        return json(res, error?.code === "PROVIDER_NOT_CONFIGURED" ? 503 : 502, { error: error?.message || "AI analysis failed." });
+      }
     }
     if (req.method === "GET" && url.pathname === "/api/audit") {
       return json(res, 200, { verification: audit.verify(), events: audit.list().reverse() });
