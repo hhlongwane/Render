@@ -4,7 +4,7 @@ import { AGENTS } from "./agents.js";
 const ROUTES = [
   { pattern: /network|dns|firewall|routing|vpn|protocol/i, ids: ["A01","A02","A05","F03","F05"] },
   { pattern: /windows|linux|android|ios|mobile|device|firmware|hardware/i, ids: ["A04","C01","C02","C03","C04","C05","F05"] },
-  { pattern: /web|website|application|source code|code review|dependency|package|software|api/i, ids: ["B01","B02","B03","B04","D04","G06","F05"] },
+  { pattern: /web|website|application|source code|code review|dependency|package|software|api/i, ids: ["B01","B02","B03","B04","D02","D04","G06","F05"] },
   { pattern: /cloud|aws|azure|gcp|kubernetes|container|microservice|infrastructure/i, ids: ["A02","D01","D05","G05","G11","F05"] },
   { pattern: /crypto|encryption|tls|certificate|key management|quantum|authentication|oauth|identity/i, ids: ["E01","E02","E03","E04","G11","G13","F05"] },
   { pattern: /ai|agent|model|llm|prompt injection|hugging|hugging face/i, ids: ["G03","G04","G05","G12","G15","F03","F05"] },
