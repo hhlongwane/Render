@@ -134,7 +134,7 @@ async function handle(req, res) {
       });
       return json(res, 201, { task });
     }
-    const analyzeMatch = url.pathname.match(/^\\/api\\/tasks\\/([a-f0-9-]+)\\/analyze$/);
+    const analyzeMatch = url.pathname.match(/^\/api\/tasks\/([a-f0-9-]+)\/analyze$/);
     if (req.method === "POST" && analyzeMatch) {
       const ip = req.socket.remoteAddress || "unknown";
       if (limited(analysisAttempts, ip, 6, 60 * 60 * 1000)) return json(res, 429, { error: "Analysis rate limit reached. Try again later." });
